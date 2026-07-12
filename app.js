@@ -262,7 +262,8 @@ function initializeOneSignal() {
     return;
   }
 
-  window.OneSignalDeferred = window.OneSignalDeferred || [];
+  elements.enableButton.disabled = true;
+  setStatus(elements.notificationStatus, "Connecting to the push service...");
   window.OneSignalDeferred.push(async (sdk) => {
     try {
       await sdk.init({
