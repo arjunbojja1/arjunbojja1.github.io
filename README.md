@@ -15,8 +15,8 @@ OneSignal Data Tags.
 
 The service worker URL and scope must remain:
 
-- URL: `/new-grad-job-alerts/OneSignalSDKWorker.js`
-- Scope: `/new-grad-job-alerts/`
+- URL: `/OneSignalSDKWorker.js`
+- Scope: `/`
 
 Moving the worker breaks existing subscriptions.
 

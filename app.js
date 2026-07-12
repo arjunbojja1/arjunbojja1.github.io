@@ -268,8 +268,6 @@ function initializeOneSignal() {
     try {
       await sdk.init({
         appId,
-        serviceWorkerPath: "new-grad-job-alerts/OneSignalSDKWorker.js",
-        serviceWorkerParam: { scope: "/new-grad-job-alerts/" },
         autoResubscribe: true,
         notifyButton: { enable: false },
         welcomeNotification: { disable: true },
