@@ -47,6 +47,7 @@ test("initializes push and saves personalized companies", async ({}, testInfo) =
 
   await page.locator("#recommended-button").click();
   await expect(page.locator("#selection-count")).toHaveText("39 selected");
+  await page.locator('input[name="track"][value="internship"]').check();
 
   const enableButton = page.locator("#enable-button");
   if (await enableButton.isEnabled()) {
@@ -73,6 +74,14 @@ test("initializes push and saves personalized companies", async ({}, testInfo) =
     "Preferences saved. Your alerts are active.",
     { timeout: 10_000 },
   );
+  await expect
+    .poll(() =>
+      page.evaluate(() => window.OneSignal?.User?.getTags?.()),
+    )
+    .toMatchObject({
+      track_new_grad: "1",
+      track_internship: "1",
+    });
 
   const registrationUrls = await page.evaluate(async () => {
     const registrations = await navigator.serviceWorker.getRegistrations();

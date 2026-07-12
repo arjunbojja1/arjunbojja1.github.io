@@ -16,12 +16,19 @@ TABLE_START
 | **Google** | Software Engineer | Mountain View | link | Jul 12 |
 | **Google** | Site Reliability Engineer | Sunnyvale | link | Jul 11 |
 | **Scale** | Backend Engineer | San Francisco | link | Jul 10 |
+| Capital One | Data Analyst Intern | McLean | link | Jul 10 |
+| ↳ | Product Internship | Plano | link | Jul 10 |
 TABLE_END
 | **Microsoft** | Outside table | Redmond | link | Jul 09 |
 `;
 
-test("parses and canonicalizes unique companies", () => {
-  assert.deepEqual(parseCompanies(README), ["Google", "Scale AI", "Uber"]);
+test("parses, inherits, and canonicalizes unique companies", () => {
+  assert.deepEqual(parseCompanies(README), [
+    "Capital One",
+    "Google",
+    "Scale AI",
+    "Uber",
+  ]);
 });
 
 test("creates stable OneSignal tag keys", () => {
@@ -37,4 +44,22 @@ test("requires source table markers", () => {
 test("reports source HTTP errors", async () => {
   const fakeFetch = async () => ({ ok: false, status: 503 });
   await assert.rejects(() => fetchCompanies(fakeFetch), /HTTP 503/);
+});
+
+test("merges companies from both trackers", async () => {
+  const readmes = [
+    README,
+    README.replace("Google", "Microsoft").replace("Scale", "Stripe"),
+  ];
+  let request = 0;
+  const fakeFetch = async () => ({
+    ok: true,
+    text: async () => readmes[request++],
+  });
+
+  const companies = await fetchCompanies(fakeFetch);
+
+  assert.ok(companies.includes("Google"));
+  assert.ok(companies.includes("Microsoft"));
+  assert.ok(companies.includes("Stripe"));
 });

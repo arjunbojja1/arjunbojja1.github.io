@@ -184,6 +184,46 @@ h2 {
   margin-bottom: 12px;
 }
 
+.track-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 22px;
+}
+
+.track-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid #dfe5f0;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.track-option:has(input:checked) {
+  border-color: #7394f8;
+  background: #f0f4ff;
+}
+
+.track-option input {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  accent-color: #315cdb;
+}
+
+.track-option span,
+.track-option small {
+  display: block;
+}
+
+.track-option small {
+  margin-top: 5px;
+  color: #667085;
+  line-height: 1.4;
+}
+
 .text-button {
   padding: 6px 3px;
   border: 0;
@@ -278,6 +318,10 @@ footer {
 
   .company-list {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .track-options {
+    grid-template-columns: 1fr;
   }
 }
 

@@ -1,9 +1,10 @@
 # New Grad Job Alerts PWA
 
 An installable GitHub Pages app for personalized Web Push notifications from
-the [`New-Grad-2027`](https://github.com/vanshb03/New-Grad-2027) tracker.
-Subscribers choose companies anonymously; their preferences are stored as
-OneSignal Data Tags.
+the [`New-Grad-2027`](https://github.com/vanshb03/New-Grad-2027) and
+[`Summer2027-Internships`](https://github.com/vanshb03/Summer2027-Internships)
+trackers. Subscribers anonymously choose alert types and companies; their
+preferences are stored as OneSignal Data Tags.
 
 ## OneSignal setup
 

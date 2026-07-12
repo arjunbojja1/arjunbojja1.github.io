@@ -8,6 +8,12 @@ import {
 const MAX_SELECTIONS = 50;
 const STORAGE_KEY = "new-grad-alert-companies";
 const SYNCED_STORAGE_KEY = "new-grad-alert-synced-companies";
+const TRACK_STORAGE_KEY = "new-grad-alert-tracks";
+const SYNCED_TRACK_STORAGE_KEY = "new-grad-alert-synced-tracks";
+const TRACK_TAGS = {
+  new_grad: "track_new_grad",
+  internship: "track_internship",
+};
 
 const elements = {
   clearButton: document.querySelector("#clear-button"),
@@ -21,12 +27,19 @@ const elements = {
   saveStatus: document.querySelector("#save-status"),
   search: document.querySelector("#company-search"),
   selectionCount: document.querySelector("#selection-count"),
+  trackInputs: [...document.querySelectorAll('input[name="track"]')],
 };
 
 let companies = [];
 let deferredInstallPrompt = null;
 let oneSignal = null;
 let selected = readStoredSet(STORAGE_KEY);
+let selectedTracks = new Set(
+  [...readStoredSet(TRACK_STORAGE_KEY)].filter((track) => TRACK_TAGS[track]),
+);
+if (!selectedTracks.size) {
+  selectedTracks.add("new_grad");
+}
 
 function readStoredSet(key) {
   try {
@@ -153,8 +166,33 @@ function clearCompanies() {
   setStatus(elements.saveStatus, "Selections cleared. Save to sync.");
 }
 
+function renderTracks() {
+  for (const input of elements.trackInputs) {
+    input.checked = selectedTracks.has(input.value);
+  }
+}
+
+function toggleTrack(input) {
+  if (input.checked) {
+    selectedTracks.add(input.value);
+  } else if (selectedTracks.size === 1) {
+    input.checked = true;
+    setStatus(elements.saveStatus, "Select at least one alert type.", true);
+    return;
+  } else {
+    selectedTracks.delete(input.value);
+  }
+  writeStoredSet(TRACK_STORAGE_KEY, selectedTracks);
+  setStatus(elements.saveStatus, "Alert types changed. Save to sync them.");
+}
+
 async function syncPreferences() {
   writeStoredSet(STORAGE_KEY, selected);
+  writeStoredSet(TRACK_STORAGE_KEY, selectedTracks);
+  if (!selected.size) {
+    setStatus(elements.saveStatus, "Select at least one company.", true);
+    return;
+  }
   if (!isPushActive()) {
     setStatus(
       elements.saveStatus,
@@ -170,6 +208,12 @@ async function syncPreferences() {
     const removedTags = [...previouslySynced]
       .filter((company) => !selected.has(company))
       .map(companyTag);
+    const previouslySyncedTracks = readStoredSet(SYNCED_TRACK_STORAGE_KEY);
+    removedTags.push(
+      ...[...previouslySyncedTracks]
+        .filter((track) => !selectedTracks.has(track))
+        .map((track) => TRACK_TAGS[track]),
+    );
     if (removedTags.length) {
       await oneSignal.User.removeTags(removedTags);
     }
@@ -177,11 +221,13 @@ async function syncPreferences() {
     const tags = Object.fromEntries(
       [...selected].map((company) => [companyTag(company), "1"]),
     );
-    if (Object.keys(tags).length) {
-      await oneSignal.User.addTags(tags);
+    for (const track of selectedTracks) {
+      tags[TRACK_TAGS[track]] = "1";
     }
+    await oneSignal.User.addTags(tags);
 
     writeStoredSet(SYNCED_STORAGE_KEY, selected);
+    writeStoredSet(SYNCED_TRACK_STORAGE_KEY, selectedTracks);
     setStatus(elements.saveStatus, "Preferences saved. Your alerts are active.");
   } catch (error) {
     console.error(error);
@@ -312,6 +358,9 @@ function initializeOneSignal() {
         }
       });
       renderNotificationState();
+      if (isPushActive() && selected.size) {
+        await syncPreferences();
+      }
     } catch (error) {
       console.error(error);
       elements.enableButton.disabled = true;
@@ -348,7 +397,11 @@ elements.enableButton.addEventListener("click", enableNotifications);
 elements.recommendedButton.addEventListener("click", selectRecommended);
 elements.saveButton.addEventListener("click", syncPreferences);
 elements.search.addEventListener("input", renderCompanies);
+for (const input of elements.trackInputs) {
+  input.addEventListener("change", () => toggleTrack(input));
+}
 
 initializeInstallExperience();
 initializeOneSignal();
+renderTracks();
 loadCompanies();
