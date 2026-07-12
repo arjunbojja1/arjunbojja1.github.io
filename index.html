@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#111827">
+    <meta
+      name="description"
+      content="Choose companies and receive push notifications when new graduate jobs are posted."
+    >
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" href="icons/icon-192.png">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <link rel="stylesheet" href="styles.css">
+    <script src="config.js"></script>
+    <script
+      src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js"
+      defer
+    ></script>
+    <script type="module" src="app.js"></script>
+    <title>New Grad Job Alerts</title>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="hero">
+        <div class="eyebrow">New Grad Job Alerts</div>
+        <h1>Be early to the roles you want.</h1>
+        <p>
+          Pick companies, enable notifications, and get a direct link whenever
+          a matching job is added to the New-Grad-2027 tracker.
+        </p>
+      </header>
+
+      <section id="ios-install" class="notice hidden" aria-live="polite">
+        <strong>Install on iPhone first.</strong>
+        Open this page in Safari, tap Share, choose Add to Home Screen, then
+        launch Job Alerts from the new icon.
+      </section>
+
+      <section class="card setup-card" aria-labelledby="setup-heading">
+        <div>
+          <span class="step">Step 1</span>
+          <h2 id="setup-heading">Enable push notifications</h2>
+          <p id="notification-status" class="muted" aria-live="polite">
+            Checking notification support...
+          </p>
+        </div>
+        <div class="button-row">
+          <button id="install-button" class="button secondary hidden" type="button">
+            Install app
+          </button>
+          <button id="enable-button" class="button primary" type="button">
+            Enable notifications
+          </button>
+        </div>
+      </section>
+
+      <section class="card" aria-labelledby="companies-heading">
+        <div class="section-heading">
+          <div>
+            <span class="step">Step 2</span>
+            <h2 id="companies-heading">Choose companies</h2>
+            <p class="muted">
+              Select up to 50. Your choices stay attached to this browser.
+            </p>
+          </div>
+          <span id="selection-count" class="count">0 selected</span>
+        </div>
+
+        <label class="search">
+          <span class="sr-only">Search companies</span>
+          <input
+            id="company-search"
+            type="search"
+            placeholder="Search companies"
+            autocomplete="off"
+          >
+        </label>
+
+        <div class="preference-actions">
+          <button id="recommended-button" class="text-button" type="button">
+            Select recommended 39
+          </button>
+          <button id="clear-button" class="text-button" type="button">
+            Clear all
+          </button>
+        </div>
+
+        <div id="company-list" class="company-list" aria-live="polite">
+          <p class="muted">Loading companies...</p>
+        </div>
+
+        <div class="save-row">
+          <p id="save-status" class="muted" aria-live="polite">
+            Choose companies, then save your preferences.
+          </p>
+          <button id="save-button" class="button primary" type="button">
+            Save preferences
+          </button>
+        </div>
+      </section>
+
+      <footer>
+        Jobs are sourced from
+        <a href="https://github.com/vanshb03/New-Grad-2027">New-Grad-2027</a>.
+        Notification preferences are stored by OneSignal.
+      </footer>
+    </main>
+  </body>
+</html>
