@@ -15,6 +15,10 @@ test("loads the installable PWA assets", async ({ request }) => {
     /^(application|text)\/javascript/,
   );
   expect(await worker.text()).toContain("OneSignalSDK.sw.js");
+
+  const supabase = await request.get("vendor/supabase.js");
+  expect(supabase.ok()).toBeTruthy();
+  expect(await supabase.text()).toContain("createClient");
 });
 
 test("requires authentication before showing the application", async ({

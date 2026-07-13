@@ -124,7 +124,7 @@ test("shows a recoverable error when authentication cannot load", async ({
       body: oneSignalStub,
     }),
   );
-  await page.route("**/supabase.min.js", (route) => route.abort());
+  await page.route("**/vendor/supabase.js", (route) => route.abort());
 
   await page.goto(process.env.PWA_TEST_URL || "/", {
     waitUntil: "domcontentloaded",
@@ -144,7 +144,7 @@ test("shows a recoverable error when authentication cannot load", async ({
 test("keeps account sign-in available when the push SDK is blocked", async ({
   page,
 }) => {
-  await page.route("**/OneSignalSDK.page.js", (route) => route.abort());
+  await page.route(/^https:\/\/cdn\./, (route) => route.abort());
   const pageErrors = [];
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
