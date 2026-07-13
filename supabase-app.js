@@ -1,3 +1,10 @@
+import {
+  formatJobTiming,
+  resumeMatchScore,
+  sortJobsNewestFirst,
+  sourceLabel,
+} from "./job-utils.js";
+
 const config = window.NEW_GRAD_ALERTS_CONFIG || {};
 const SOURCE_KEYS = new Set([
   "new_grad",
@@ -551,13 +558,7 @@ async function initializeSupabase() {
 }
 
 function jobScore(job) {
-  const skills = currentProfile?.resume_profile?.skills || [];
-  if (!skills.length) {
-    return 0;
-  }
-  const haystack = `${job.title} ${job.description || ""}`.toLowerCase();
-  const matched = skills.filter((skill) => haystack.includes(skill.toLowerCase()));
-  return Math.round((matched.length / skills.length) * 100);
+  return resumeMatchScore(job, currentProfile?.resume_profile);
 }
 
 function jobMatchesSearch(job, query) {
@@ -577,11 +578,16 @@ function createJobCard(job) {
   company.textContent = job.company;
   const meta = document.createElement("div");
   meta.className = "job-meta";
-  meta.textContent = `${job.location || "Location not listed"} · ${job.source.replaceAll("_", " ")}`;
+  meta.textContent = `${job.location || "Location not listed"} · ${sourceLabel(job.source)}`;
+  const timing = document.createElement("div");
+  timing.className = "job-meta job-timing";
+  timing.textContent = formatJobTiming(job);
   const score = document.createElement("span");
   score.className = "count";
-  score.textContent = `${jobScore(job)}% match`;
-  content.append(title, company, meta);
+  const matchScore = jobScore(job);
+  score.textContent =
+    matchScore === null ? "Upload resume" : `${matchScore}% match`;
+  content.append(title, company, meta, timing);
 
   const actions = document.createElement("div");
   actions.className = "button-row";
@@ -621,17 +627,43 @@ async function loadJobs() {
   if (!client) {
     return;
   }
-  const { data, error } = await client
-    .from("jobs")
-    .select("*")
-    .eq("status", "open")
-    .order("posted_at", { ascending: false, nullsFirst: false })
-    .limit(250);
-  if (error) {
+  const fields = [
+    "id",
+    "source",
+    "company",
+    "title",
+    "location",
+    "url",
+    "description",
+    "role_category",
+    "posted_at",
+    "first_seen_at",
+    "recommendation_terms",
+  ].join(",");
+  const [
+    { data: datedJobs, error: datedError },
+    { data: undatedJobs, error: undatedError },
+  ] = await Promise.all([
+    client
+      .from("jobs")
+      .select(fields)
+      .eq("status", "open")
+      .not("posted_at", "is", null)
+      .order("posted_at", { ascending: false })
+      .limit(250),
+    client
+      .from("jobs")
+      .select(fields)
+      .eq("status", "open")
+      .is("posted_at", null)
+      .order("first_seen_at", { ascending: false })
+      .limit(250),
+  ]);
+  if (datedError || undatedError) {
     setText(elements.jobList, "Jobs could not be loaded.", true);
     return;
   }
-  jobs = data;
+  jobs = sortJobsNewestFirst([...datedJobs, ...undatedJobs]).slice(0, 250);
   renderJobs();
 }
 

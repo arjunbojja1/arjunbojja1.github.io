@@ -338,13 +338,32 @@ fieldset.field {
 
 .chip-options label,
 .chip-options > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   padding: 8px 11px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: 10px;
   color: var(--text);
   background: var(--surface-raised);
   font-size: 0.83rem;
   font-weight: 650;
+}
+
+.chip-options input {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  min-height: 16px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
+  accent-color: var(--accent);
+}
+
+.chip-options > span {
+  border-radius: 999px;
 }
 
 .checkbox-field {
@@ -425,6 +444,11 @@ fieldset.field {
 .job-meta {
   color: var(--muted);
   font-size: 0.84rem;
+}
+
+.job-timing {
+  margin-top: 4px;
+  color: var(--muted-soft);
 }
 
 .application-controls {
