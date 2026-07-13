@@ -90,6 +90,13 @@ test("requires an account and defaults to dark mode", async ({ page }) => {
     dialogBackground: "rgb(16, 23, 34)",
     headerVisibility: "hidden",
   });
+  const selectionCount = await page.evaluate(() => {
+    for (let index = 0; index < 75; index += 1) {
+      window.JobAlertsUI.addCompanyAndTrack(`Test Company ${index}`, "ats");
+    }
+    return window.JobAlertsUI.getBasicPreferences().companies.length;
+  });
+  expect(selectionCount).toBeGreaterThan(50);
   expect(errors).toEqual([]);
   const anonymousRejected = await page.evaluate(async () => {
     const config = window.NEW_GRAD_ALERTS_CONFIG;

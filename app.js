@@ -5,7 +5,6 @@ import {
   normalizeCompany,
 } from "./company-data.js";
 
-const MAX_SELECTIONS = 50;
 const STORAGE_KEY = "new-grad-alert-companies";
 const SYNCED_STORAGE_KEY = "new-grad-alert-synced-companies";
 const TRACK_STORAGE_KEY = "new-grad-alert-tracks";
@@ -130,16 +129,6 @@ function renderSelectionCount() {
 }
 
 function toggleCompany(company, checkbox) {
-  if (checkbox.checked && selected.size >= MAX_SELECTIONS) {
-    checkbox.checked = false;
-    setStatus(
-      elements.saveStatus,
-      `Choose at most ${MAX_SELECTIONS} companies.`,
-      true,
-    );
-    return;
-  }
-
   if (checkbox.checked) {
     selected.add(company);
   } else {
@@ -151,7 +140,7 @@ function toggleCompany(company, checkbox) {
 }
 
 function selectRecommended() {
-  selected = new Set(RECOMMENDED_COMPANIES.slice(0, MAX_SELECTIONS));
+  selected = new Set(RECOMMENDED_COMPANIES);
   companies = [...new Set([...companies, ...selected])].sort((left, right) =>
     left.localeCompare(right),
   );
@@ -399,7 +388,7 @@ function applyBasicPreferences(preferences) {
     Array.isArray(preferences.companies) &&
     preferences.companies.length
   ) {
-    selected = new Set(preferences.companies.slice(0, MAX_SELECTIONS));
+    selected = new Set(preferences.companies);
     if (
       Array.isArray(preferences.source_keys) &&
       preferences.source_keys.length
@@ -427,9 +416,6 @@ window.JobAlertsUI = {
   }),
   addCompanyAndTrack: (company, track) => {
     const name = company.trim();
-    if (!selected.has(name) && selected.size >= MAX_SELECTIONS) {
-      throw new Error(`Choose at most ${MAX_SELECTIONS} companies.`);
-    }
     selected.add(name);
     selectedTracks.add(track);
     companies = [...new Set([...companies, name])].sort((left, right) =>

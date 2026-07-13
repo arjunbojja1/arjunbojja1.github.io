@@ -39,9 +39,29 @@ test("creates stable OneSignal tag keys", () => {
 });
 
 test("includes requested companies in the recommended set", () => {
-  assert.equal(RECOMMENDED_COMPANIES.length, 41);
-  assert.ok(RECOMMENDED_COMPANIES.includes("Datadog"));
-  assert.ok(RECOMMENDED_COMPANIES.includes("Google DeepMind"));
+  const requested = [
+    "Datadog",
+    "Google DeepMind",
+    "HRT",
+    "IMC",
+    "Jane Street",
+    "Jump Trading",
+    "Lyft",
+    "Optiver",
+    "Palantir",
+    "PayPal",
+    "Pinterest",
+    "Qualcomm",
+  ];
+
+  assert.equal(RECOMMENDED_COMPANIES.length, 51);
+  assert.ok(requested.every((company) => RECOMMENDED_COMPANIES.includes(company)));
+});
+
+test("canonicalizes requested trading and Qualcomm company names", () => {
+  assert.equal(canonicalCompany("Hudson River Trading"), "HRT");
+  assert.equal(canonicalCompany("Jump Trading Group"), "Jump Trading");
+  assert.equal(canonicalCompany("Qualcomm Technologies, Inc."), "Qualcomm");
 });
 
 test("requires source table markers", () => {
