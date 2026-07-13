@@ -3,7 +3,7 @@ import {
   companyTag,
   fetchCompanies,
   normalizeCompany,
-} from "./company-data.js?v=20260713-3";
+} from "./company-data.js?v=20260713-4";
 
 const STORAGE_KEY = "new-grad-alert-companies";
 const SYNCED_STORAGE_KEY = "new-grad-alert-synced-companies";

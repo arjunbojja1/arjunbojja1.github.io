@@ -3,8 +3,8 @@ import {
   resumeMatchDetails,
   resumeMatchScore,
   sourceLabel,
-} from "./job-utils.js?v=20260713-3";
-import { readPdfPageText } from "./pdf-utils.js?v=20260713-3";
+} from "./job-utils.js?v=20260713-4";
+import { readPdfPageText } from "./pdf-utils.js?v=20260713-4";
 
 const config = window.NEW_GRAD_ALERTS_CONFIG || {};
 const SOURCE_KEYS = new Set([
@@ -99,6 +99,7 @@ const elements = {
   minimumScoreOutput: document.querySelector("#minimum-score-output"),
   closureAlerts: document.querySelector("#closure-alerts"),
   emailFallback: document.querySelector("#email-fallback"),
+  emailFallbackHelp: document.querySelector("#email-fallback-help"),
   deliveryMode: document.querySelector("#delivery-mode"),
   timezone: document.querySelector("#timezone-input"),
   digestHour: document.querySelector("#digest-hour"),
@@ -261,8 +262,15 @@ function renderSetupHealth() {
     ),
     createHealthItem(
       "Email fallback",
-      currentPreferences?.email_fallback ? "Enabled" : "Off",
-      currentPreferences?.email_fallback ? "ready" : "warning",
+      systemHealth?.email_fallback_configured
+        ? currentPreferences?.email_fallback
+          ? "Enabled"
+          : "Off"
+        : "Needs provider setup",
+      systemHealth?.email_fallback_configured &&
+        currentPreferences?.email_fallback
+        ? "ready"
+        : "warning",
     ),
     createHealthItem(
       "Last successful scan",
@@ -1380,6 +1388,12 @@ async function loadSystemHealth() {
     return;
   }
   systemHealth = data || {};
+  elements.emailFallback.disabled =
+    !systemHealth.email_fallback_configured;
+  elements.emailFallbackHelp.textContent =
+    systemHealth.email_fallback_configured
+      ? "Uses your account email only if push fails."
+      : "Requires a Resend API key and verified sender.";
   const scanAge = systemHealth.last_successful_scan_at
     ? Date.now() - new Date(systemHealth.last_successful_scan_at).getTime()
     : Infinity;
@@ -1552,9 +1566,9 @@ function renderResumeProfile(profile) {
 }
 
 async function extractPdfText(file) {
-  const pdfjs = await import("./vendor/pdf.mjs?v=20260713-3");
+  const pdfjs = await import("./vendor/pdf.mjs?v=20260713-4");
   pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-    "./vendor/pdf.worker.mjs?v=20260713-3",
+    "./vendor/pdf.worker.mjs?v=20260713-4",
     import.meta.url,
   ).href;
   const pdf = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
