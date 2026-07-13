@@ -126,7 +126,7 @@ function aliasMatches(alias, jobTerms) {
   return aliasTerms.length > 0 && aliasTerms.every((term) => jobTerms.has(term));
 }
 
-export function resumeMatchScore(job, resumeProfile) {
+export function resumeMatchDetails(job, resumeProfile) {
   const skills = resumeProfile?.skills || [];
   const keywords = resumeProfile?.keywords || [];
   if (!skills.length && !keywords.length) {
@@ -146,13 +146,13 @@ export function resumeMatchScore(job, resumeProfile) {
     }),
   ]);
 
-  const directMatches = skills.filter((skill) => {
+  const matchedSkills = skills.filter((skill) => {
     const aliases = SKILL_ALIASES[skill.toLowerCase()] || [skill];
     return aliases.some((alias) => aliasMatches(alias, jobTerms));
-  }).length;
-  const overlap = [...jobTerms].filter(
+  });
+  const overlappingTerms = [...jobTerms].filter(
     (term) => !GENERIC_JOB_TERMS.has(term) && resumeTerms.has(term),
-  ).length;
+  );
   const category =
     job.role_category && job.role_category !== "other"
       ? job.role_category
@@ -163,12 +163,36 @@ export function resumeMatchScore(job, resumeProfile) {
   const categoryMatches =
     categoryTerms && [...categoryTerms].some((term) => resumeTerms.has(term));
 
-  return Math.min(
+  const score = Math.min(
     95,
-    Math.min(48, directMatches * 12) +
-      Math.min(32, overlap * 8) +
+    Math.min(48, matchedSkills.length * 12) +
+      Math.min(32, overlappingTerms.length * 8) +
       (categoryMatches ? 25 : 0),
   );
+  const reasons = [];
+  if (matchedSkills.length) {
+    reasons.push(`Skills: ${matchedSkills.slice(0, 3).join(", ")}`);
+  }
+  if (categoryMatches) {
+    reasons.push(`${String(category).replaceAll("_", " ")} role affinity`);
+  }
+  if (overlappingTerms.length) {
+    reasons.push(
+      `Resume terms: ${overlappingTerms.slice(0, 3).join(", ")}`,
+    );
+  }
+  if (!job.description) {
+    reasons.push("Estimate based on title because no job description is available");
+  }
+  return {
+    score,
+    reasons,
+    hasDescription: Boolean(job.description),
+  };
+}
+
+export function resumeMatchScore(job, resumeProfile) {
+  return resumeMatchDetails(job, resumeProfile)?.score ?? null;
 }
 
 export function effectivePostedDate(job, referenceDate = new Date()) {

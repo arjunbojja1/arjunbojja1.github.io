@@ -12,8 +12,8 @@
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="icon" href="icons/icon-192.png">
     <link rel="apple-touch-icon" href="icons/icon-192.png">
-    <link rel="stylesheet" href="styles.css?v=20260713-2">
-    <script src="config.js?v=20260713-2"></script>
+    <link rel="stylesheet" href="styles.css?v=20260713-3">
+    <script src="config.js?v=20260713-3"></script>
     <script>
       window.OneSignalDeferred = window.OneSignalDeferred || [];
     </script>
@@ -26,8 +26,8 @@
       src="vendor/supabase.js"
       defer
     ></script>
-    <script type="module" src="app.js?v=20260713-2"></script>
-    <script type="module" src="supabase-app.js?v=20260713-2"></script>
+    <script type="module" src="app.js?v=20260713-3"></script>
+    <script type="module" src="supabase-app.js?v=20260713-3"></script>
     <title>New Grad Job Alerts</title>
   </head>
   <body class="auth-required">
@@ -37,7 +37,9 @@
         <button class="nav-button active" data-view="alerts" type="button">Alerts</button>
         <button class="nav-button" data-view="jobs" type="button">Jobs</button>
         <button class="nav-button" data-view="applications" type="button">Applications</button>
+        <button class="nav-button" data-view="inbox" type="button">Inbox</button>
         <button class="nav-button" data-view="resume" type="button">Resume</button>
+        <button class="nav-button" data-view="status" type="button">Status</button>
       </nav>
       <button id="account-button" class="button secondary compact" type="button">
         Connecting...
@@ -59,6 +61,22 @@
           <strong>Install on iPhone first.</strong>
           Open this page in Safari, tap Share, choose Add to Home Screen, then
           launch Job Alerts from the new icon.
+        </section>
+
+        <section class="card health-card" aria-labelledby="health-heading">
+          <div class="section-heading">
+            <div>
+              <div class="eyebrow">Setup health</div>
+              <h2 id="health-heading">Your alerts at a glance</h2>
+            </div>
+            <button id="test-alert-button" class="button secondary" type="button">
+              Send test alert
+            </button>
+          </div>
+          <div id="setup-health-list" class="health-grid">
+            <p class="muted">Checking your setup...</p>
+          </div>
+          <p id="test-alert-status" class="muted" aria-live="polite"></p>
         </section>
 
         <section class="card setup-card" aria-labelledby="setup-heading">
@@ -104,7 +122,7 @@
             </label>
             <label class="track-option">
               <input type="checkbox" name="track[]" value="ats">
-              <span><strong>Company career sites</strong><small>Your Greenhouse, Lever, Ashby, and Workday monitors</small></span>
+              <span><strong>Custom career sites</strong><small>Shared recommended-company boards are automatic; enable this for monitors you add below</small></span>
             </label>
           </div>
         </section>
@@ -188,6 +206,10 @@
               <input id="closure-alerts" type="checkbox" checked>
               <span>Notify me when saved roles close</span>
             </label>
+            <label class="field checkbox-field">
+              <input id="email-fallback" type="checkbox">
+              <span>Email me when push delivery is unavailable</span>
+            </label>
           </div>
         </section>
 
@@ -246,18 +268,106 @@
         </header>
         <div class="card">
           <label class="search"><span class="sr-only">Search jobs</span><input id="job-search" type="search" placeholder="Search title, company, or location"></label>
+          <div class="job-filters">
+            <label class="field">
+              <span>Feed</span>
+              <select id="job-feed-mode">
+                <option value="for_you">For you</option>
+                <option value="all">All jobs</option>
+                <option value="hidden">Hidden jobs</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Role</span>
+              <select id="job-role-filter">
+                <option value="">All roles</option>
+                <option value="software">Software</option>
+                <option value="data">Data</option>
+                <option value="ai_ml">AI / ML</option>
+                <option value="product">Product</option>
+                <option value="quant">Quant</option>
+                <option value="security">Security</option>
+                <option value="hardware">Hardware</option>
+                <option value="other">Other</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Source</span>
+              <select id="job-source-filter">
+                <option value="">All sources</option>
+                <option value="new_grad">US new grad</option>
+                <option value="canada_new_grad">Canada new grad</option>
+                <option value="internship">Summer internship</option>
+                <option value="offseason_internship">Off-season</option>
+                <option value="ats">Career sites</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Application</span>
+              <select id="job-application-filter">
+                <option value="">Any status</option>
+                <option value="saved">Saved</option>
+                <option value="applied">Applied</option>
+                <option value="interview">Interview</option>
+                <option value="offer">Offer</option>
+                <option value="rejected">Rejected</option>
+                <option value="withdrawn">Withdrawn</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Sort</span>
+              <select id="job-sort">
+                <option value="newest">Newest</option>
+                <option value="match">Best match</option>
+                <option value="oldest">Oldest</option>
+              </select>
+            </label>
+            <label class="field checkbox-field compact-check">
+              <input id="job-remote-filter" type="checkbox">
+              <span>Remote only</span>
+            </label>
+            <label class="field checkbox-field compact-check">
+              <input id="job-unseen-filter" type="checkbox">
+              <span>Unseen only</span>
+            </label>
+          </div>
+          <p id="job-results-status" class="muted" aria-live="polite"></p>
           <div id="job-list" class="job-list"><p class="muted">Loading jobs...</p></div>
+          <button id="load-more-jobs" class="button secondary full hidden" type="button">
+            Load more jobs
+          </button>
         </div>
       </section>
 
       <section id="view-applications" class="app-view hidden">
         <header class="page-heading">
           <div><div class="eyebrow">Stay organized</div><h1>Applications</h1></div>
-          <button id="add-application-button" class="button primary" type="button">Add application</button>
+          <div class="button-row">
+            <button id="export-applications-button" class="button secondary" type="button">Export CSV</button>
+            <button id="add-application-button" class="button primary" type="button">Add application</button>
+          </div>
         </header>
         <div id="application-summary" class="summary-grid"></div>
         <div class="card">
+          <label class="field checkbox-field compact-check">
+            <input id="show-archived-applications" type="checkbox">
+            <span>Show archived applications</span>
+          </label>
           <div id="application-list" class="stack-list"><p class="muted">Sign in to track applications.</p></div>
+        </div>
+      </section>
+
+      <section id="view-inbox" class="app-view hidden">
+        <header class="page-heading">
+          <div><div class="eyebrow">Delivery history</div><h1>Alert inbox</h1></div>
+          <div class="button-row">
+            <button id="inbox-test-alert-button" class="button primary" type="button">Send test alert</button>
+            <button id="mark-inbox-read" class="button secondary" type="button">Mark all read</button>
+          </div>
+        </header>
+        <div class="card">
+          <p id="inbox-summary" class="muted">Loading alerts...</p>
+          <div id="inbox-list" class="stack-list"></div>
         </div>
       </section>
 
@@ -274,6 +384,26 @@
           </label>
           <p id="resume-status" class="muted" aria-live="polite">No resume uploaded.</p>
           <div id="resume-skills" class="chip-options"></div>
+          <button id="remove-resume-button" class="button secondary hidden" type="button">
+            Remove resume
+          </button>
+        </div>
+      </section>
+
+      <section id="view-status" class="app-view hidden">
+        <header class="page-heading">
+          <div><div class="eyebrow">Operational visibility</div><h1>System status</h1></div>
+          <button id="refresh-status-button" class="button secondary" type="button">Refresh</button>
+        </header>
+        <div id="system-health-grid" class="health-grid">
+          <p class="muted">Loading service health...</p>
+        </div>
+        <div class="card">
+          <h2>What this means</h2>
+          <p class="muted">
+            Scanner freshness, source failures, notification backlog, and shared
+            career-site health are updated by the automated job scanner.
+          </p>
         </div>
       </section>
 
@@ -289,7 +419,11 @@
             <label class="field"><span>Email</span><input id="auth-email" type="email" placeholder="you@example.com"></label>
             <button id="magic-link-signin" class="button primary full" type="button" disabled>Email me a magic link</button>
           </div>
-          <button id="signout-button" class="button secondary full hidden" type="button">Sign out</button>
+          <div id="signed-in-controls" class="hidden">
+            <button id="export-data-button" class="button secondary full" type="button">Export my data</button>
+            <button id="delete-account-button" class="text-button danger full" type="button">Delete account</button>
+            <button id="signout-button" class="button secondary full" type="button">Sign out</button>
+          </div>
         </form>
       </dialog>
       <script>
@@ -306,8 +440,33 @@
           <label class="field"><span>Location</span><input id="application-location" type="text"></label>
           <label class="field"><span>Job URL</span><input id="application-url" type="url"></label>
           <label class="field"><span>Status</span><select id="application-status-input"><option value="saved">Saved</option><option value="applied">Applied</option><option value="interview">Interview</option><option value="offer">Offer</option><option value="rejected">Rejected</option><option value="withdrawn">Withdrawn</option></select></label>
+          <label class="field"><span>Application deadline</span><input id="application-deadline" type="date"></label>
+          <label class="field"><span>Next step</span><input id="application-next-step" type="datetime-local"></label>
+          <label class="field"><span>Contact</span><input id="application-contact" type="text" placeholder="Recruiter or referral"></label>
           <label class="field"><span>Notes</span><textarea id="application-notes" rows="4"></textarea></label>
+          <label class="field checkbox-field">
+            <input id="application-archived" type="checkbox">
+            <span>Archive this application</span>
+          </label>
           <button class="button primary full" type="submit">Save application</button>
+        </form>
+      </dialog>
+
+      <dialog id="delete-account-dialog">
+        <form id="delete-account-form" class="dialog-card">
+          <button class="dialog-close" type="button" data-close-dialog aria-label="Close">×</button>
+          <div class="eyebrow">Permanent action</div>
+          <h2>Delete your account?</h2>
+          <p class="muted">
+            This removes your preferences, applications, alerts, monitors, and
+            private resume. This cannot be undone.
+          </p>
+          <label class="field">
+            <span>Type DELETE to confirm</span>
+            <input id="delete-account-confirmation" type="text" required pattern="DELETE" autocomplete="off">
+          </label>
+          <p id="delete-account-status" class="muted" aria-live="polite"></p>
+          <button class="button danger full" type="submit">Delete everything</button>
         </form>
       </dialog>
 

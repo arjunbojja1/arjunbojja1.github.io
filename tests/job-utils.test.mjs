@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import {
   effectivePostedDate,
   formatJobTiming,
+  resumeMatchDetails,
   resumeMatchScore,
   sortJobsNewestFirst,
 } from "../job-utils.js";
@@ -36,6 +37,23 @@ test("scores sparse tracker jobs using role and resume terms", () => {
   assert.equal(baseline, 25);
   assert.ok(aiRole > baseline);
   assert.equal(resumeMatchScore({ title: "Engineer" }, {}), null);
+});
+
+test("explains score quality and matching signals", () => {
+  const details = resumeMatchDetails(
+    {
+      title: "Backend Python Engineer",
+      description: "",
+      recommendation_terms: ["backend", "python"],
+      role_category: "software",
+    },
+    SOFTWARE_RESUME,
+  );
+
+  assert.ok(details.score > 25);
+  assert.ok(details.reasons.some((reason) => reason.includes("Python")));
+  assert.ok(details.reasons.some((reason) => reason.includes("no job description")));
+  assert.equal(details.hasDescription, false);
 });
 
 test("infers software affinity for sparse mobile and test roles", () => {

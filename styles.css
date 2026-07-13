@@ -87,7 +87,9 @@ body.auth-required main > :not(#account-dialog) {
 }
 
 button,
-input {
+input,
+select,
+textarea {
   font: inherit;
 }
 
@@ -229,6 +231,19 @@ h2 {
   background: var(--surface-raised);
 }
 
+.button.danger {
+  color: #fff;
+  background: #a63145;
+}
+
+.button.danger:hover:not(:disabled) {
+  background: #8f293b;
+}
+
+.text-button.danger {
+  color: #ff9aa7;
+}
+
 .count {
   flex: none;
   padding: 7px 11px;
@@ -277,6 +292,56 @@ h2 {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 18px;
   margin-top: 22px;
+}
+
+.health-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.health-item {
+  min-width: 0;
+  padding: 15px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: var(--surface-raised);
+}
+
+.health-item strong,
+.health-item span {
+  display: block;
+}
+
+.health-item span {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.health-item[data-state="ready"] strong {
+  color: #79d5a4;
+}
+
+.health-item[data-state="warning"] strong {
+  color: #ffc773;
+}
+
+.health-item[data-state="error"] strong {
+  color: #ff9aa7;
+}
+
+.job-filters {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(120px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.compact-check {
+  align-self: end;
+  min-height: 44px;
 }
 
 .field {
@@ -449,6 +514,31 @@ fieldset.field {
 .job-timing {
   margin-top: 4px;
   color: var(--muted-soft);
+}
+
+.job-match-reasons {
+  margin: 9px 0 0;
+  color: var(--muted-soft);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.job-card.unseen {
+  border-color: var(--accent);
+}
+
+.job-card .application-badge {
+  color: #79d5a4;
+}
+
+.inbox-item.unread {
+  border-color: var(--accent);
+  background: var(--surface-accent);
+}
+
+#signed-in-controls {
+  display: grid;
+  gap: 12px;
 }
 
 .application-controls {
@@ -758,8 +848,13 @@ footer {
   }
 
   .form-grid,
-  .inline-form {
+  .inline-form,
+  .job-filters {
     grid-template-columns: 1fr;
+  }
+
+  .health-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .field.span-2 {
@@ -768,6 +863,10 @@ footer {
 
   .summary-grid {
     grid-template-columns: repeat(3, 1fr);
+  }
+
+  .health-grid {
+    grid-template-columns: 1fr;
   }
 }
 

@@ -1,10 +1,10 @@
 import {
   formatJobTiming,
+  resumeMatchDetails,
   resumeMatchScore,
-  sortJobsNewestFirst,
   sourceLabel,
-} from "./job-utils.js?v=20260713-2";
-import { readPdfPageText } from "./pdf-utils.js?v=20260713-2";
+} from "./job-utils.js?v=20260713-3";
+import { readPdfPageText } from "./pdf-utils.js?v=20260713-3";
 
 const config = window.NEW_GRAD_ALERTS_CONFIG || {};
 const SOURCE_KEYS = new Set([
@@ -22,6 +22,7 @@ const APPLICATION_STATUSES = [
   "rejected",
   "withdrawn",
 ];
+const JOB_PAGE_SIZE = 40;
 const ACCOUNT_MIGRATION_KEY = "job-alerts-pending-account-migration";
 const ONESIGNAL_IDENTITY_KEY = "job-alerts-onesignal-user";
 const MIGRATABLE_PREFERENCE_FIELDS = [
@@ -36,6 +37,7 @@ const MIGRATABLE_PREFERENCE_FIELDS = [
   "allow_citizenship_required",
   "closure_alerts",
   "minimum_score",
+  "email_fallback",
 ];
 const MIGRATABLE_PROFILE_FIELDS = [
   "timezone",
@@ -71,7 +73,14 @@ const elements = {
   accountHeading: document.querySelector("#account-heading"),
   accountStatus: document.querySelector("#account-status"),
   signedOutControls: document.querySelector("#signed-out-controls"),
+  signedInControls: document.querySelector("#signed-in-controls"),
   signoutButton: document.querySelector("#signout-button"),
+  exportDataButton: document.querySelector("#export-data-button"),
+  deleteAccountButton: document.querySelector("#delete-account-button"),
+  deleteAccountDialog: document.querySelector("#delete-account-dialog"),
+  deleteAccountForm: document.querySelector("#delete-account-form"),
+  deleteAccountConfirmation: document.querySelector("#delete-account-confirmation"),
+  deleteAccountStatus: document.querySelector("#delete-account-status"),
   googleSignin: document.querySelector("#google-signin"),
   googleDivider: document.querySelector("#google-divider"),
   magicLinkSignin: document.querySelector("#magic-link-signin"),
@@ -89,6 +98,7 @@ const elements = {
   minimumScore: document.querySelector("#minimum-score"),
   minimumScoreOutput: document.querySelector("#minimum-score-output"),
   closureAlerts: document.querySelector("#closure-alerts"),
+  emailFallback: document.querySelector("#email-fallback"),
   deliveryMode: document.querySelector("#delivery-mode"),
   timezone: document.querySelector("#timezone-input"),
   digestHour: document.querySelector("#digest-hour"),
@@ -100,10 +110,21 @@ const elements = {
   monitorList: document.querySelector("#monitor-list"),
   refreshJobs: document.querySelector("#refresh-jobs"),
   jobSearch: document.querySelector("#job-search"),
+  jobFeedMode: document.querySelector("#job-feed-mode"),
+  jobRoleFilter: document.querySelector("#job-role-filter"),
+  jobSourceFilter: document.querySelector("#job-source-filter"),
+  jobApplicationFilter: document.querySelector("#job-application-filter"),
+  jobSort: document.querySelector("#job-sort"),
+  jobRemoteFilter: document.querySelector("#job-remote-filter"),
+  jobUnseenFilter: document.querySelector("#job-unseen-filter"),
+  jobResultsStatus: document.querySelector("#job-results-status"),
+  loadMoreJobs: document.querySelector("#load-more-jobs"),
   jobList: document.querySelector("#job-list"),
   applicationSummary: document.querySelector("#application-summary"),
   applicationList: document.querySelector("#application-list"),
   addApplicationButton: document.querySelector("#add-application-button"),
+  exportApplicationsButton: document.querySelector("#export-applications-button"),
+  showArchivedApplications: document.querySelector("#show-archived-applications"),
   applicationDialog: document.querySelector("#application-dialog"),
   applicationForm: document.querySelector("#application-form"),
   applicationId: document.querySelector("#application-id"),
@@ -112,10 +133,24 @@ const elements = {
   applicationLocation: document.querySelector("#application-location"),
   applicationUrl: document.querySelector("#application-url"),
   applicationStatus: document.querySelector("#application-status-input"),
+  applicationDeadline: document.querySelector("#application-deadline"),
+  applicationNextStep: document.querySelector("#application-next-step"),
+  applicationContact: document.querySelector("#application-contact"),
+  applicationArchived: document.querySelector("#application-archived"),
   applicationNotes: document.querySelector("#application-notes"),
+  inboxSummary: document.querySelector("#inbox-summary"),
+  inboxList: document.querySelector("#inbox-list"),
+  markInboxRead: document.querySelector("#mark-inbox-read"),
+  testAlertButton: document.querySelector("#test-alert-button"),
+  inboxTestAlertButton: document.querySelector("#inbox-test-alert-button"),
+  testAlertStatus: document.querySelector("#test-alert-status"),
+  setupHealthList: document.querySelector("#setup-health-list"),
+  systemHealthGrid: document.querySelector("#system-health-grid"),
+  refreshStatusButton: document.querySelector("#refresh-status-button"),
   resumeFile: document.querySelector("#resume-file"),
   resumeStatus: document.querySelector("#resume-status"),
   resumeSkills: document.querySelector("#resume-skills"),
+  removeResumeButton: document.querySelector("#remove-resume-button"),
 };
 
 let client = null;
@@ -124,6 +159,11 @@ let currentProfile = null;
 let currentPreferences = null;
 let jobs = [];
 let applications = [];
+let jobOffset = 0;
+let jobTotal = 0;
+let jobLoadVersion = 0;
+let jobSearchTimer = null;
+let systemHealth = null;
 let readyResolve;
 const ready = new Promise((resolve) => {
   readyResolve = resolve;
@@ -157,6 +197,79 @@ function requireAccount(message) {
   setText(elements.accountStatus, message);
   elements.accountDialog.showModal();
   return false;
+}
+
+function createHealthItem(label, value, state = "ready") {
+  const item = document.createElement("div");
+  item.className = "health-item";
+  item.dataset.state = state;
+  const strong = document.createElement("strong");
+  strong.textContent = value;
+  const span = document.createElement("span");
+  span.textContent = label;
+  item.append(strong, span);
+  return item;
+}
+
+function formatRelativeTime(value) {
+  if (!value) {
+    return "Never";
+  }
+  const elapsedMinutes = Math.max(
+    0,
+    Math.round((Date.now() - new Date(value).getTime()) / 60_000),
+  );
+  if (elapsedMinutes < 2) {
+    return "Just now";
+  }
+  if (elapsedMinutes < 60) {
+    return `${elapsedMinutes} minutes ago`;
+  }
+  const hours = Math.round(elapsedMinutes / 60);
+  return hours < 48 ? `${hours} hours ago` : `${Math.round(hours / 24)} days ago`;
+}
+
+function renderSetupHealth() {
+  const pushActive = Boolean(window.JobAlertsUI?.isPushActive());
+  const companies = currentPreferences?.companies?.length || 0;
+  const scanAt = systemHealth?.last_successful_scan_at;
+  const scanAge = scanAt ? Date.now() - new Date(scanAt).getTime() : Infinity;
+  elements.setupHealthList.replaceChildren(
+    createHealthItem(
+      "Account",
+      isSignedIn() ? "Connected" : "Sign in required",
+      isSignedIn() ? "ready" : "error",
+    ),
+    createHealthItem(
+      "Resume",
+      currentProfile?.resume_path ? "Processed" : "Not uploaded",
+      currentProfile?.resume_path ? "ready" : "warning",
+    ),
+    createHealthItem(
+      "Companies",
+      companies ? `${companies} selected` : "None selected",
+      companies ? "ready" : "error",
+    ),
+    createHealthItem(
+      "Push delivery",
+      pushActive ? "Enabled" : "Unavailable",
+      pushActive
+        ? "ready"
+        : currentPreferences?.email_fallback
+          ? "warning"
+          : "error",
+    ),
+    createHealthItem(
+      "Email fallback",
+      currentPreferences?.email_fallback ? "Enabled" : "Off",
+      currentPreferences?.email_fallback ? "ready" : "warning",
+    ),
+    createHealthItem(
+      "Last successful scan",
+      formatRelativeTime(scanAt),
+      scanAge <= 3 * 60 * 60 * 1000 ? "ready" : "error",
+    ),
+  );
 }
 
 async function jobAlertsUI() {
@@ -252,9 +365,13 @@ function showView(name) {
   }
   history.replaceState(null, "", `#${name}`);
   if (name === "jobs") {
-    loadJobs();
+    resetAndLoadJobs();
   } else if (name === "applications") {
     loadApplications();
+  } else if (name === "inbox") {
+    loadInbox();
+  } else if (name === "status") {
+    loadSystemHealth();
   }
 }
 
@@ -273,6 +390,7 @@ function populateAdvancedPreferences(preferences, profile) {
   elements.minimumScore.value = String(preferences.minimum_score || 0);
   elements.minimumScoreOutput.value = `${preferences.minimum_score || 0}%`;
   elements.closureAlerts.checked = preferences.closure_alerts !== false;
+  elements.emailFallback.checked = preferences.email_fallback === true;
   for (const input of elements.roleCategories) {
     input.checked = (preferences.role_categories || []).includes(input.value);
   }
@@ -302,6 +420,7 @@ function collectAdvancedPreferences() {
     allow_no_sponsorship: eligibility !== "sponsorship",
     allow_citizenship_required: eligibility === "any",
     closure_alerts: elements.closureAlerts.checked,
+    email_fallback: elements.emailFallback.checked,
     minimum_score: Number(elements.minimumScore.value),
   };
 }
@@ -350,6 +469,7 @@ async function persistPreferences(basicPreferences) {
   }
   currentPreferences = preferences;
   currentProfile = profile;
+  renderSetupHealth();
 }
 
 async function savePreferences(basicPreferences) {
@@ -405,7 +525,7 @@ function renderAccount() {
     ? "Your account"
     : "Sign in to Job Alerts";
   elements.signedOutControls.classList.toggle("hidden", signedIn);
-  elements.signoutButton.classList.toggle("hidden", !signedIn);
+  elements.signedInControls.classList.toggle("hidden", !signedIn);
   elements.accountClose.classList.toggle("hidden", !signedIn);
   elements.googleSignin.disabled = signedIn || !config.googleAuthEnabled;
   elements.magicLinkSignin.disabled = signedIn;
@@ -423,6 +543,7 @@ function renderAccount() {
   } else if (!elements.accountDialog.open) {
     elements.accountDialog.showModal();
   }
+  renderSetupHealth();
 }
 
 async function preserveAnonymousPreferences(user) {
@@ -565,11 +686,17 @@ async function handleSession(session) {
   ui.applyBasicPreferences(preferences);
   renderAccount();
   syncOneSignalIdentity();
-  await Promise.all([loadApplications(), loadMonitors()]);
+  await Promise.all([loadApplications(), loadMonitors(), loadSystemHealth()]);
 
   const local = ui.getBasicPreferences();
   if (!preferences.companies.length && local?.companies.length) {
     await persistPreferences(local);
+  }
+  const activeView = location.hash.slice(1) || "alerts";
+  if (activeView === "jobs") {
+    await resetAndLoadJobs();
+  } else if (activeView === "inbox") {
+    await loadInbox();
   }
 }
 
@@ -622,14 +749,24 @@ function jobScore(job) {
   return resumeMatchScore(job, currentProfile?.resume_profile);
 }
 
-function jobMatchesSearch(job, query) {
-  const haystack = `${job.company} ${job.title} ${job.location}`.toLowerCase();
-  return haystack.includes(query.toLowerCase());
+async function markJobState(jobId, values) {
+  const { error } = await client.from("job_user_state").upsert(
+    {
+      user_id: currentUser.id,
+      job_id: jobId,
+      ...values,
+    },
+    { onConflict: "user_id,job_id" },
+  );
+  if (error) {
+    throw error;
+  }
 }
 
 function createJobCard(job) {
   const card = document.createElement("article");
   card.className = "job-card";
+  card.classList.toggle("unseen", !job.viewed_at);
   const header = document.createElement("div");
   header.className = "job-card-header";
   const content = document.createElement("div");
@@ -645,10 +782,26 @@ function createJobCard(job) {
   timing.textContent = formatJobTiming(job);
   const score = document.createElement("span");
   score.className = "count";
-  const matchScore = jobScore(job);
+  const matchDetails = resumeMatchDetails(
+    job,
+    currentProfile?.resume_profile,
+  );
+  const matchScore = matchDetails?.score ?? null;
   score.textContent =
     matchScore === null ? "Upload resume" : `${matchScore}% match`;
   content.append(title, company, meta, timing);
+  if (job.application_status) {
+    const applicationBadge = document.createElement("div");
+    applicationBadge.className = "job-meta application-badge";
+    applicationBadge.textContent = `Application: ${job.application_status}`;
+    content.append(applicationBadge);
+  }
+  if (matchDetails?.reasons.length) {
+    const reasons = document.createElement("p");
+    reasons.className = "job-match-reasons";
+    reasons.textContent = matchDetails.reasons.join(" · ");
+    content.append(reasons);
+  }
 
   const actions = document.createElement("div");
   actions.className = "button-row";
@@ -658,74 +811,175 @@ function createJobCard(job) {
   apply.target = "_blank";
   apply.rel = "noopener";
   apply.textContent = "Apply";
+  apply.addEventListener("click", () => {
+    markJobState(job.id, { viewed_at: new Date().toISOString() })
+      .then(() => {
+        job.viewed_at = new Date().toISOString();
+        card.classList.remove("unseen");
+      })
+      .catch(console.error);
+  });
   const save = document.createElement("button");
   save.className = "button primary";
   save.type = "button";
-  save.textContent = "Save";
-  save.addEventListener("click", () => saveJobApplication(job));
-  actions.append(apply, save);
+  save.textContent = job.application_status ? "Edit application" : "Save";
+  save.addEventListener("click", async () => {
+    if (job.application_status) {
+      if (!applications.some((application) => application.job_id === job.id)) {
+        await loadApplications();
+      }
+      openApplicationDialog(
+        applications.find((application) => application.job_id === job.id) || {
+          job_id: job.id,
+          company: job.company,
+          title: job.title,
+          location: job.location,
+          url: job.url,
+          status: job.application_status,
+        },
+      );
+      return;
+    }
+    await saveJobApplication(job);
+  });
+  const hide = document.createElement("button");
+  hide.className = "text-button";
+  hide.type = "button";
+  hide.textContent = job.hidden_at ? "Unhide" : "Hide";
+  hide.addEventListener("click", async () => {
+    try {
+      await markJobState(job.id, {
+        hidden_at: job.hidden_at ? null : new Date().toISOString(),
+      });
+      jobs = jobs.filter((item) => item.id !== job.id);
+      jobTotal = Math.max(0, jobTotal - 1);
+      renderJobs();
+    } catch (error) {
+      console.error(error);
+      setText(elements.jobResultsStatus, "Could not hide this job.", true);
+    }
+  });
+  actions.append(apply, save, hide);
   header.append(content, score);
   card.append(header, actions);
   return card;
 }
 
 function renderJobs() {
-  const query = elements.jobSearch.value.trim();
-  const visible = jobs.filter((job) => jobMatchesSearch(job, query));
-  if (!visible.length) {
+  if (!jobs.length) {
     elements.jobList.replaceChildren(
       Object.assign(document.createElement("p"), {
         className: "muted",
-        textContent: "No matching jobs are available yet.",
+        textContent:
+          elements.jobFeedMode.value === "for_you"
+            ? "No jobs currently match your saved alert preferences."
+            : "No matching jobs are available.",
       }),
     );
-    return;
+  } else {
+    elements.jobList.replaceChildren(...jobs.map(createJobCard));
   }
-  elements.jobList.replaceChildren(...visible.map(createJobCard));
+  setText(
+    elements.jobResultsStatus,
+    `${jobs.length.toLocaleString()} shown of ${jobTotal.toLocaleString()} matching jobs.`,
+  );
 }
 
-async function loadJobs() {
-  if (!client) {
+function jobFeedParameters() {
+  const role = elements.jobRoleFilter.value;
+  const source = elements.jobSourceFilter.value;
+  const applicationStatus = elements.jobApplicationFilter.value;
+  return {
+    p_mode: elements.jobFeedMode.value,
+    p_search: elements.jobSearch.value.trim() || null,
+    p_roles: role ? [role] : null,
+    p_sources: source ? [source] : null,
+    p_remote_only: elements.jobRemoteFilter.checked,
+    p_application_status: applicationStatus || null,
+    p_only_unseen: elements.jobUnseenFilter.checked,
+    p_sort: elements.jobSort.value === "match" ? "newest" : elements.jobSort.value,
+    p_limit: elements.jobSort.value === "match" ? 1000 : JOB_PAGE_SIZE,
+    p_offset: elements.jobSort.value === "match" ? 0 : jobOffset,
+  };
+}
+
+async function loadJobs({ append = false } = {}) {
+  if (!client || !isSignedIn()) {
+    setText(
+      elements.jobList,
+      "Sign in to view your personalized job feed.",
+    );
+    setText(elements.jobResultsStatus, "");
+    elements.loadMoreJobs.classList.add("hidden");
     return;
   }
-  const fields = [
-    "id",
-    "source",
-    "company",
-    "title",
-    "location",
-    "url",
-    "description",
-    "role_category",
-    "posted_at",
-    "first_seen_at",
-    "recommendation_terms",
-  ].join(",");
-  const [
-    { data: datedJobs, error: datedError },
-    { data: undatedJobs, error: undatedError },
-  ] = await Promise.all([
-    client
-      .from("jobs")
-      .select(fields)
-      .eq("status", "open")
-      .not("posted_at", "is", null)
-      .order("posted_at", { ascending: false })
-      .limit(250),
-    client
-      .from("jobs")
-      .select(fields)
-      .eq("status", "open")
-      .is("posted_at", null)
-      .order("first_seen_at", { ascending: false })
-      .limit(250),
-  ]);
-  if (datedError || undatedError) {
-    setText(elements.jobList, "Jobs could not be loaded.", true);
+  const loadVersion = ++jobLoadVersion;
+  elements.loadMoreJobs.disabled = true;
+  setText(elements.jobResultsStatus, append ? "Loading more jobs..." : "Loading jobs...");
+  const parameters = jobFeedParameters();
+  const exhaustive =
+    elements.jobSort.value === "match" ||
+    (
+      elements.jobFeedMode.value === "for_you" &&
+      Number(currentPreferences?.minimum_score || 0) > 0
+    );
+  if (exhaustive) {
+    parameters.p_limit = 1000;
+    parameters.p_offset = 0;
+  }
+  const { data, error } = await client.rpc("get_job_feed", parameters);
+  if (loadVersion !== jobLoadVersion) {
     return;
   }
-  jobs = sortJobsNewestFirst([...datedJobs, ...undatedJobs]).slice(0, 250);
+  elements.loadMoreJobs.disabled = false;
+  if (error) {
+    console.error(error);
+    setText(elements.jobResultsStatus, "Jobs could not be loaded.", true);
+    return;
+  }
+  const rawJobs = data || [];
+  const minimumScore =
+    elements.jobFeedMode.value === "for_you"
+      ? Number(currentPreferences?.minimum_score || 0)
+      : 0;
+  let pageJobs = rawJobs.filter(
+    (job) => minimumScore === 0 || (jobScore(job) || 0) >= minimumScore,
+  );
+  if (elements.jobSort.value === "match") {
+    pageJobs = [...pageJobs].sort(
+      (left, right) =>
+        (jobScore(right) ?? -1) - (jobScore(left) ?? -1) ||
+        new Date(right.first_seen_at) - new Date(left.first_seen_at),
+    );
+  }
+  jobTotal = exhaustive
+    ? pageJobs.length
+    : Number(rawJobs[0]?.total_count || 0);
+  jobOffset += rawJobs.length;
+  if (append) {
+    const existingIds = new Set(jobs.map((job) => job.id));
+    jobs.push(...pageJobs.filter((job) => !existingIds.has(job.id)));
+  } else {
+    jobs = pageJobs;
+  }
+  elements.loadMoreJobs.classList.toggle(
+    "hidden",
+    exhaustive || jobOffset >= jobTotal,
+  );
   renderJobs();
+}
+
+function resetAndLoadJobs() {
+  jobOffset = 0;
+  jobTotal = 0;
+  jobs = [];
+  elements.jobList.replaceChildren(
+    Object.assign(document.createElement("p"), {
+      className: "muted",
+      textContent: "Loading jobs...",
+    }),
+  );
+  return loadJobs();
 }
 
 async function saveJobApplication(job) {
@@ -746,9 +1000,14 @@ async function saveJobApplication(job) {
   );
   if (error) {
     console.error(error);
+    setText(elements.jobResultsStatus, "Could not save this application.", true);
     return;
   }
+  job.application_status = "saved";
+  job.viewed_at = new Date().toISOString();
+  await markJobState(job.id, { viewed_at: job.viewed_at });
   await loadApplications();
+  renderJobs();
 }
 
 function renderApplicationSummary() {
@@ -770,6 +1029,15 @@ function renderApplicationSummary() {
   );
 }
 
+function toLocalDateTimeInput(value) {
+  if (!value) {
+    return "";
+  }
+  const date = new Date(value);
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 16);
+}
+
 function openApplicationDialog(application = null) {
   if (!requireAccount("Sign in to track applications.")) {
     return;
@@ -781,6 +1049,12 @@ function openApplicationDialog(application = null) {
   elements.applicationLocation.value = application?.location || "";
   elements.applicationUrl.value = application?.url || "";
   elements.applicationStatus.value = application?.status || "saved";
+  elements.applicationDeadline.value = application?.deadline_at || "";
+  elements.applicationNextStep.value = toLocalDateTimeInput(
+    application?.next_step_at,
+  );
+  elements.applicationContact.value = application?.contact || "";
+  elements.applicationArchived.checked = application?.archived === true;
   elements.applicationNotes.value = application?.notes || "";
   elements.applicationDialog.showModal();
 }
@@ -792,7 +1066,19 @@ function createApplicationCard(application) {
   title.textContent = `${application.company} — ${application.title}`;
   const meta = document.createElement("div");
   meta.className = "job-meta";
-  meta.textContent = application.location || "Location not listed";
+  const details = [application.location || "Location not listed"];
+  if (application.deadline_at) {
+    details.push(`Deadline ${application.deadline_at}`);
+  }
+  if (application.next_step_at) {
+    details.push(
+      `Next step ${new Date(application.next_step_at).toLocaleString()}`,
+    );
+  }
+  if (application.contact) {
+    details.push(`Contact: ${application.contact}`);
+  }
+  meta.textContent = details.join(" · ");
   const status = document.createElement("select");
   for (const value of APPLICATION_STATUSES) {
     const option = document.createElement("option");
@@ -821,10 +1107,31 @@ function createApplicationCard(application) {
   edit.type = "button";
   edit.textContent = "Edit";
   edit.addEventListener("click", () => openApplicationDialog(application));
+  const remove = document.createElement("button");
+  remove.className = "text-button danger";
+  remove.type = "button";
+  remove.textContent = "Delete";
+  remove.addEventListener("click", async () => {
+    if (!window.confirm("Delete this application from your tracker?")) {
+      return;
+    }
+    const { error } = await client
+      .from("applications")
+      .delete()
+      .eq("id", application.id);
+    if (error) {
+      console.error(error);
+      return;
+    }
+    await loadApplications();
+    if (!document.querySelector("#view-jobs").classList.contains("hidden")) {
+      await resetAndLoadJobs();
+    }
+  });
   const controls = document.createElement("div");
   controls.className = "application-controls";
   status.className = "application-status";
-  controls.append(status, edit);
+  controls.append(status, edit, remove);
   card.append(title, meta, controls);
   return card;
 }
@@ -836,10 +1143,14 @@ async function loadApplications() {
     setText(elements.applicationList, "Sign in to track applications.");
     return;
   }
-  const { data, error } = await client
+  let query = client
     .from("applications")
     .select("*")
     .order("updated_at", { ascending: false });
+  if (!elements.showArchivedApplications.checked) {
+    query = query.eq("archived", false);
+  }
+  const { data, error } = await query;
   if (error) {
     setText(elements.applicationList, "Applications could not be loaded.", true);
     return;
@@ -870,6 +1181,12 @@ async function saveApplication(event) {
     location: elements.applicationLocation.value.trim(),
     url: elements.applicationUrl.value.trim() || null,
     status: elements.applicationStatus.value,
+    deadline_at: elements.applicationDeadline.value || null,
+    next_step_at: elements.applicationNextStep.value
+      ? new Date(elements.applicationNextStep.value).toISOString()
+      : null,
+    contact: elements.applicationContact.value.trim(),
+    archived: elements.applicationArchived.checked,
     notes: elements.applicationNotes.value.trim(),
   };
   let query = client.from("applications");
@@ -883,6 +1200,221 @@ async function saveApplication(event) {
   }
   elements.applicationDialog.close();
   await loadApplications();
+}
+
+function csvCell(value) {
+  const text = String(value ?? "");
+  return `"${text.replaceAll('"', '""')}"`;
+}
+
+async function exportApplications() {
+  const { data, error } = await client
+    .from("applications")
+    .select("*")
+    .order("updated_at", { ascending: false });
+  if (error) {
+    console.error(error);
+    return;
+  }
+  const columns = [
+    "company",
+    "title",
+    "location",
+    "status",
+    "applied_at",
+    "deadline_at",
+    "next_step_at",
+    "contact",
+    "url",
+    "notes",
+    "archived",
+  ];
+  const csv = [
+    columns.map(csvCell).join(","),
+    ...data.map((application) =>
+      columns.map((column) => csvCell(application[column])).join(","),
+    ),
+  ].join("\n");
+  downloadFile(
+    `job-applications-${new Date().toISOString().slice(0, 10)}.csv`,
+    csv,
+    "text/csv",
+  );
+}
+
+function createInboxItem(item) {
+  const card = document.createElement("article");
+  card.className = "list-card inbox-item";
+  card.classList.toggle("unread", !item.read_at);
+  const title = document.createElement("h3");
+  title.textContent =
+    item.event === "test"
+      ? "Test alert"
+      : item.event === "job_closed"
+        ? `Role closed${item.job ? ` at ${item.job.company}` : ""}`
+        : item.job
+          ? `New role at ${item.job.company}`
+          : "Job alert update";
+  const meta = document.createElement("div");
+  meta.className = "job-meta";
+  const timestamp = item.sent_at || item.created_at;
+  meta.textContent = [
+    item.job?.title,
+    item.status,
+    timestamp ? new Date(timestamp).toLocaleString() : null,
+  ].filter(Boolean).join(" · ");
+  card.append(title, meta);
+  if (item.last_error && item.status === "failed") {
+    const error = document.createElement("p");
+    error.className = "job-match-reasons";
+    error.textContent = item.last_error;
+    card.append(error);
+  }
+  if (item.job?.url) {
+    const open = document.createElement("a");
+    open.className = "text-button";
+    open.href = item.job.url;
+    open.target = "_blank";
+    open.rel = "noopener";
+    open.textContent = "Open role";
+    open.addEventListener("click", () => markInboxItemRead(item));
+    card.append(open);
+  }
+  return card;
+}
+
+async function markInboxItemRead(item) {
+  if (item.read_at) {
+    return;
+  }
+  const readAt = new Date().toISOString();
+  const { error } = await client
+    .from("notification_queue")
+    .update({ read_at: readAt })
+    .eq("id", item.id);
+  if (!error) {
+    item.read_at = readAt;
+    await loadInbox();
+  }
+}
+
+async function loadInbox() {
+  if (!client || !isSignedIn()) {
+    return;
+  }
+  const { data, error } = await client
+    .from("notification_queue")
+    .select(
+      "id,event,status,created_at,sent_at,read_at,last_error,job:jobs(id,company,title,url)",
+    )
+    .order("created_at", { ascending: false })
+    .limit(100);
+  if (error) {
+    console.error(error);
+    setText(elements.inboxSummary, "Alert history could not be loaded.", true);
+    return;
+  }
+  const unread = data.filter((item) => !item.read_at).length;
+  setText(
+    elements.inboxSummary,
+    `${data.length} recent alerts · ${unread} unread`,
+  );
+  elements.inboxList.replaceChildren(
+    ...(data.length
+      ? data.map(createInboxItem)
+      : [
+          Object.assign(document.createElement("p"), {
+            className: "muted",
+            textContent: "No alerts have been queued yet.",
+          }),
+        ]),
+  );
+}
+
+async function markInboxRead() {
+  const { error } = await client
+    .from("notification_queue")
+    .update({ read_at: new Date().toISOString() })
+    .eq("user_id", currentUser.id)
+    .is("read_at", null);
+  if (error) {
+    console.error(error);
+    return;
+  }
+  await loadInbox();
+}
+
+async function requestTestAlert() {
+  elements.testAlertButton.disabled = true;
+  elements.inboxTestAlertButton.disabled = true;
+  setText(elements.testAlertStatus, "Queueing a test alert...");
+  const { error } = await client.rpc("request_test_notification");
+  elements.testAlertButton.disabled = false;
+  elements.inboxTestAlertButton.disabled = false;
+  if (error) {
+    setText(elements.testAlertStatus, error.message, true);
+    setText(elements.inboxSummary, error.message, true);
+    return;
+  }
+  setText(
+    elements.testAlertStatus,
+    "Test alert queued. It will be delivered during the next scanner run.",
+  );
+  setText(
+    elements.inboxSummary,
+    "Test alert queued for the next scanner run.",
+  );
+  await loadInbox();
+}
+
+async function loadSystemHealth() {
+  if (!client || !isSignedIn()) {
+    return;
+  }
+  const { data, error } = await client.rpc("get_system_health");
+  if (error) {
+    console.error(error);
+    elements.systemHealthGrid.replaceChildren(
+      createHealthItem("Service health", "Unavailable", "error"),
+    );
+    return;
+  }
+  systemHealth = data || {};
+  const scanAge = systemHealth.last_successful_scan_at
+    ? Date.now() - new Date(systemHealth.last_successful_scan_at).getTime()
+    : Infinity;
+  elements.systemHealthGrid.replaceChildren(
+    createHealthItem(
+      "Last successful scan",
+      formatRelativeTime(systemHealth.last_successful_scan_at),
+      scanAge <= 3 * 60 * 60 * 1000 ? "ready" : "error",
+    ),
+    createHealthItem(
+      "Open jobs",
+      Number(systemHealth.open_jobs || 0).toLocaleString(),
+    ),
+    createHealthItem(
+      "Source failures in 24h",
+      String(systemHealth.failed_runs_24h || 0),
+      systemHealth.failed_runs_24h ? "warning" : "ready",
+    ),
+    createHealthItem(
+      "Pending alerts",
+      String(systemHealth.pending_notifications || 0),
+      systemHealth.pending_notifications > 100 ? "warning" : "ready",
+    ),
+    createHealthItem(
+      "Failed alerts in 24h",
+      String(systemHealth.failed_notifications || 0),
+      systemHealth.failed_notifications ? "error" : "ready",
+    ),
+    createHealthItem(
+      "Shared career monitors",
+      `${systemHealth.healthy_shared_monitors || 0} healthy`,
+      systemHealth.shared_monitor_errors ? "warning" : "ready",
+    ),
+  );
+  renderSetupHealth();
 }
 
 function detectMonitor(url) {
@@ -1009,13 +1541,20 @@ function renderResumeProfile(profile) {
   );
   if (currentProfile?.resume_path) {
     setText(elements.resumeStatus, `Resume ready · ${skills.length} skills detected.`);
+  } else {
+    setText(elements.resumeStatus, "No resume uploaded.");
   }
+  elements.removeResumeButton.classList.toggle(
+    "hidden",
+    !currentProfile?.resume_path,
+  );
+  renderSetupHealth();
 }
 
 async function extractPdfText(file) {
-  const pdfjs = await import("./vendor/pdf.mjs?v=20260713-2");
+  const pdfjs = await import("./vendor/pdf.mjs?v=20260713-3");
   pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-    "./vendor/pdf.worker.mjs?v=20260713-2",
+    "./vendor/pdf.worker.mjs?v=20260713-3",
     import.meta.url,
   ).href;
   const pdf = await pdfjs.getDocument({ data: await file.arrayBuffer() }).promise;
@@ -1074,6 +1613,7 @@ async function uploadResume() {
         console.error(removeError);
       }
     }
+
     currentProfile = data;
     renderResumeProfile(profile);
   } catch (error) {
@@ -1084,6 +1624,126 @@ async function uploadResume() {
       true,
     );
   }
+}
+
+async function removeResume() {
+  if (!currentProfile?.resume_path) {
+    return;
+  }
+  if (!window.confirm("Remove your stored resume and detected skills?")) {
+    return;
+  }
+  elements.removeResumeButton.disabled = true;
+  const path = currentProfile.resume_path;
+  const { error: removeError } = await client.storage
+    .from("resumes")
+    .remove([path]);
+  if (removeError) {
+    elements.removeResumeButton.disabled = false;
+    setText(elements.resumeStatus, removeError.message, true);
+    return;
+  }
+  const { data, error } = await client
+    .from("profiles")
+    .update({ resume_path: null, resume_profile: {} })
+    .eq("id", currentUser.id)
+    .select()
+    .single();
+  elements.removeResumeButton.disabled = false;
+  if (error) {
+    setText(elements.resumeStatus, error.message, true);
+    return;
+  }
+  currentProfile = data;
+  renderResumeProfile({});
+}
+
+function downloadFile(filename, contents, type) {
+  const url = URL.createObjectURL(new Blob([contents], { type }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function exportAccountData() {
+  const tables = [
+    "profiles",
+    "preferences",
+    "applications",
+    "company_monitors",
+    "notification_queue",
+    "notification_deliveries",
+    "job_user_state",
+  ];
+  const results = await Promise.all(
+    tables.map(async (table) => {
+      const { data, error } = await client.from(table).select("*");
+      if (error) {
+        throw error;
+      }
+      return [table, data];
+    }),
+  );
+  downloadFile(
+    `job-alerts-export-${new Date().toISOString().slice(0, 10)}.json`,
+    JSON.stringify(
+      {
+        exported_at: new Date().toISOString(),
+        account_email: currentUser.email,
+        ...Object.fromEntries(results),
+      },
+      null,
+      2,
+    ),
+    "application/json",
+  );
+}
+
+async function deleteAccount(event) {
+  event.preventDefault();
+  if (elements.deleteAccountConfirmation.value !== "DELETE") {
+    setText(elements.deleteAccountStatus, "Type DELETE exactly.", true);
+    return;
+  }
+  const submit = elements.deleteAccountForm.querySelector('[type="submit"]');
+  submit.disabled = true;
+  setText(elements.deleteAccountStatus, "Deleting your account...");
+  const { data: resumeFiles, error: listError } = await client.storage
+    .from("resumes")
+    .list(currentUser.id, { limit: 100 });
+  if (listError) {
+    submit.disabled = false;
+    setText(elements.deleteAccountStatus, listError.message, true);
+    return;
+  }
+  if (resumeFiles.length) {
+    const { error: removeError } = await client.storage
+      .from("resumes")
+      .remove(
+        resumeFiles.map((file) => `${currentUser.id}/${file.name}`),
+      );
+    if (removeError) {
+      submit.disabled = false;
+      setText(elements.deleteAccountStatus, removeError.message, true);
+      return;
+    }
+  }
+  window.OneSignalDeferred.push(async (sdk) => {
+    await sdk.logout();
+  });
+  const { error } = await client.rpc("delete_current_user");
+  if (error) {
+    submit.disabled = false;
+    setText(elements.deleteAccountStatus, error.message, true);
+    return;
+  }
+  localStorage.clear();
+  await client.auth.signOut({ scope: "local" });
+  window.location.reload();
 }
 
 elements.accountButton.addEventListener("click", () =>
@@ -1135,20 +1795,55 @@ elements.magicLinkSignin.addEventListener("click", async () => {
 elements.signoutButton.addEventListener("click", async () => {
   await client.auth.signOut();
 });
+elements.exportDataButton.addEventListener("click", () => {
+  exportAccountData().catch((error) => {
+    console.error(error);
+    setText(elements.accountStatus, "Your data could not be exported.", true);
+  });
+});
+elements.deleteAccountButton.addEventListener("click", () => {
+  elements.deleteAccountConfirmation.value = "";
+  setText(elements.deleteAccountStatus, "");
+  elements.deleteAccountDialog.showModal();
+});
+elements.deleteAccountForm.addEventListener("submit", deleteAccount);
 for (const button of elements.navButtons) {
   button.addEventListener("click", () => showView(button.dataset.view));
 }
 elements.minimumScore.addEventListener("input", () => {
   elements.minimumScoreOutput.value = `${elements.minimumScore.value}%`;
 });
-elements.refreshJobs.addEventListener("click", loadJobs);
-elements.jobSearch.addEventListener("input", renderJobs);
+elements.refreshJobs.addEventListener("click", resetAndLoadJobs);
+elements.loadMoreJobs.addEventListener("click", () => loadJobs({ append: true }));
+elements.jobSearch.addEventListener("input", () => {
+  clearTimeout(jobSearchTimer);
+  jobSearchTimer = setTimeout(resetAndLoadJobs, 250);
+});
+for (const control of [
+  elements.jobFeedMode,
+  elements.jobRoleFilter,
+  elements.jobSourceFilter,
+  elements.jobApplicationFilter,
+  elements.jobSort,
+  elements.jobRemoteFilter,
+  elements.jobUnseenFilter,
+]) {
+  control.addEventListener("change", resetAndLoadJobs);
+}
 elements.addApplicationButton.addEventListener("click", () =>
   openApplicationDialog(),
 );
+elements.exportApplicationsButton.addEventListener("click", exportApplications);
+elements.showArchivedApplications.addEventListener("change", loadApplications);
 elements.applicationForm.addEventListener("submit", saveApplication);
+elements.markInboxRead.addEventListener("click", markInboxRead);
+elements.testAlertButton.addEventListener("click", requestTestAlert);
+elements.inboxTestAlertButton.addEventListener("click", requestTestAlert);
+elements.refreshStatusButton.addEventListener("click", loadSystemHealth);
 elements.monitorForm.addEventListener("submit", addMonitor);
 elements.resumeFile.addEventListener("change", uploadResume);
+elements.removeResumeButton.addEventListener("click", removeResume);
+window.addEventListener("job-alerts-push-state-change", renderSetupHealth);
 for (const button of document.querySelectorAll("[data-close-dialog]")) {
   button.addEventListener("click", () => button.closest("dialog").close());
 }

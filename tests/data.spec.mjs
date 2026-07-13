@@ -84,6 +84,16 @@ test("requires an account and defaults to dark mode", async ({ page }) => {
       recommendedText: document.querySelector("#recommended-button").textContent,
       timezoneOptions: document.querySelector("#timezone-input").options.length,
       timezoneTag: document.querySelector("#timezone-input").tagName,
+      feedModes: [...document.querySelector("#job-feed-mode").options].map(
+        (option) => option.value,
+      ),
+      navViews: [...document.querySelectorAll("[data-view]")].map(
+        (button) => button.dataset.view,
+      ),
+      hasPrivacyControls: Boolean(
+        document.querySelector("#export-data-button") &&
+          document.querySelector("#delete-account-button"),
+      ),
     };
   });
 
@@ -95,6 +105,9 @@ test("requires an account and defaults to dark mode", async ({ page }) => {
     recommendedText: "Select recommended 125",
     timezoneOptions: state.timezoneOptions,
     timezoneTag: "SELECT",
+    feedModes: ["for_you", "all", "hidden"],
+    navViews: ["alerts", "jobs", "applications", "inbox", "resume", "status"],
+    hasPrivacyControls: true,
   });
   expect(state.timezoneOptions).toBeGreaterThan(10);
   const selectionCount = await page.evaluate(() => {

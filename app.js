@@ -3,7 +3,7 @@ import {
   companyTag,
   fetchCompanies,
   normalizeCompany,
-} from "./company-data.js?v=20260713-2";
+} from "./company-data.js?v=20260713-3";
 
 const STORAGE_KEY = "new-grad-alert-companies";
 const SYNCED_STORAGE_KEY = "new-grad-alert-synced-companies";
@@ -249,6 +249,7 @@ function renderNotificationState() {
       ? "Push notifications are active on this device."
       : "Notifications are off. Enable them after choosing your companies.",
   );
+  window.dispatchEvent(new Event("job-alerts-push-state-change"));
 }
 
 async function enableNotifications() {

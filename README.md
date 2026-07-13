@@ -10,7 +10,14 @@ private resume profile. An account is required. Google OAuth and email sign-in
 sync preferences across devices, and OneSignal subscriptions use the Supabase
 user ID as their external ID so targeting does not depend on Data Tags.
 
-The interface uses a dark color scheme by default.
+The interface uses a dark color scheme by default. The signed-in experience
+includes a paginated personalized job feed, hidden and unseen job state,
+application deadlines and exports, an alert inbox, service-health status,
+resume removal, data export, and account deletion.
+
+Verified shared Greenhouse, Lever, Ashby, and Workday boards extend coverage
+for recommended companies automatically. Custom career-site monitors remain
+available for supported boards that are not in the shared directory.
 
 ## OneSignal setup
 
@@ -28,6 +35,9 @@ scanner repository must hold the private Supabase secret key.
 
 Resume PDFs are limited to 5 MB and stored in the private `resumes` bucket.
 PDF text extraction and skill detection run in the browser.
+
+The scanner can use Resend as an email fallback when a user opts in and push
+delivery is unavailable. The PWA never receives the Resend API key.
 
 The service worker URL and scope must remain:
 
