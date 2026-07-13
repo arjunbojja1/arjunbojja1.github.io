@@ -73,7 +73,7 @@ function isStandalone() {
 
 function setStatus(element, message, isError = false) {
   element.textContent = message;
-  element.style.color = isError ? "#b42318" : "";
+  element.style.color = isError ? "#ff9aa7" : "";
 }
 
 function isPushActive() {
@@ -194,6 +194,13 @@ async function syncPreferences() {
   writeStoredSet(TRACK_STORAGE_KEY, selectedTracks);
   if (!selected.size) {
     setStatus(elements.saveStatus, "Select at least one company.", true);
+    return;
+  }
+  if (
+    window.JobAlertsData &&
+    !window.JobAlertsData.isAuthenticated()
+  ) {
+    setStatus(elements.saveStatus, "Sign in before saving preferences.", true);
     return;
   }
   elements.saveButton.disabled = true;

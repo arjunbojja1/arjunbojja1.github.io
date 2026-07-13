@@ -14,6 +14,28 @@ const APPLICATION_STATUSES = [
   "rejected",
   "withdrawn",
 ];
+const ACCOUNT_MIGRATION_KEY = "job-alerts-pending-account-migration";
+const ONESIGNAL_IDENTITY_KEY = "job-alerts-onesignal-user";
+const MIGRATABLE_PREFERENCE_FIELDS = [
+  "source_keys",
+  "companies",
+  "locations",
+  "role_categories",
+  "include_keywords",
+  "exclude_keywords",
+  "remote_only",
+  "allow_no_sponsorship",
+  "allow_citizenship_required",
+  "closure_alerts",
+  "minimum_score",
+];
+const MIGRATABLE_PROFILE_FIELDS = [
+  "timezone",
+  "delivery_mode",
+  "digest_hour",
+  "quiet_start",
+  "quiet_end",
+];
 const SKILL_PATTERNS = {
   Python: /\bpython\b/i,
   Java: /\bjava\b/i,
@@ -35,7 +57,9 @@ const SKILL_PATTERNS = {
 
 const elements = {
   accountButton: document.querySelector("#account-button"),
+  accountClose: document.querySelector("#account-close"),
   accountDialog: document.querySelector("#account-dialog"),
+  accountForm: document.querySelector("#account-form"),
   accountStatus: document.querySelector("#account-status"),
   signedOutControls: document.querySelector("#signed-out-controls"),
   signoutButton: document.querySelector("#signout-button"),
@@ -98,7 +122,7 @@ const ready = new Promise((resolve) => {
 
 function setText(element, value, isError = false) {
   element.textContent = value;
-  element.style.color = isError ? "#b42318" : "";
+  element.style.color = isError ? "#ff9aa7" : "";
 }
 
 function parseList(value) {
@@ -107,6 +131,14 @@ function parseList(value) {
 
 function isSignedIn() {
   return Boolean(currentUser && !currentUser.is_anonymous);
+}
+
+function selectedFields(record, fields) {
+  return Object.fromEntries(
+    fields
+      .filter((field) => Object.hasOwn(record, field))
+      .map((field) => [field, record[field]]),
+  );
 }
 
 function requireAccount(message) {
@@ -256,42 +288,184 @@ async function savePreferences(basicPreferences) {
   return persistPreferences(basicPreferences);
 }
 
-window.JobAlertsData = { savePreferences };
+window.JobAlertsData = {
+  savePreferences,
+  isAuthenticated: isSignedIn,
+};
+
+function oneSignalOperation(operation) {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error("OneSignal did not become ready."));
+    }, 15_000);
+    window.OneSignalDeferred = window.OneSignalDeferred || [];
+    window.OneSignalDeferred.push(async (sdk) => {
+      try {
+        await operation(sdk);
+        clearTimeout(timeout);
+        resolve();
+      } catch (error) {
+        clearTimeout(timeout);
+        reject(error);
+      }
+    });
+  });
+}
 
 async function loginOneSignal(user) {
-  window.OneSignalDeferred = window.OneSignalDeferred || [];
-  window.OneSignalDeferred.push(async (sdk) => {
-    await sdk.login(user.id);
-  });
+  await oneSignalOperation((sdk) => sdk.login(user.id));
+  localStorage.setItem(ONESIGNAL_IDENTITY_KEY, user.id);
+}
+
+async function logoutOneSignal() {
+  await oneSignalOperation((sdk) => sdk.logout());
+  localStorage.removeItem(ONESIGNAL_IDENTITY_KEY);
 }
 
 function renderAccount() {
   const signedIn = isSignedIn();
   elements.accountButton.textContent = signedIn
     ? currentUser.email || "Account"
-    : "Guest";
+    : "Sign in";
   elements.signedOutControls.classList.toggle("hidden", signedIn);
   elements.signoutButton.classList.toggle("hidden", !signedIn);
+  elements.accountClose.classList.toggle("hidden", !signedIn);
+  document.body.classList.toggle("auth-required", !signedIn);
   setText(
     elements.accountStatus,
     signedIn
       ? `Signed in as ${currentUser.email}. Preferences sync across devices.`
-      : "You are using a private guest profile. Sign in to sync applications and resumes.",
+      : "Sign in with Google or email to continue.",
   );
+  if (signedIn) {
+    if (elements.accountDialog.open) {
+      elements.accountDialog.close();
+    }
+  } else if (!elements.accountDialog.open) {
+    elements.accountDialog.showModal();
+  }
+}
+
+async function preserveAnonymousPreferences(user) {
+  const [
+    { data: profile, error: profileError },
+    { data: preferences, error: preferenceError },
+  ] = await Promise.all([
+    client.from("profiles").select("*").eq("id", user.id).single(),
+    client
+      .from("preferences")
+      .select("*")
+      .eq("user_id", user.id)
+      .single(),
+  ]);
+  if (profileError) {
+    throw profileError;
+  }
+  if (preferenceError) {
+    throw preferenceError;
+  }
+  localStorage.setItem(
+    ACCOUNT_MIGRATION_KEY,
+    JSON.stringify({
+      profile: selectedFields(profile, MIGRATABLE_PROFILE_FIELDS),
+      preferences: selectedFields(
+        preferences,
+        MIGRATABLE_PREFERENCE_FIELDS,
+      ),
+    }),
+  );
+}
+
+function pendingAccountMigration() {
+  const serialized = localStorage.getItem(ACCOUNT_MIGRATION_KEY);
+  if (!serialized) {
+    return null;
+  }
+  try {
+    return JSON.parse(serialized);
+  } catch (error) {
+    localStorage.removeItem(ACCOUNT_MIGRATION_KEY);
+    throw new Error("Stored guest preferences could not be migrated.", {
+      cause: error,
+    });
+  }
+}
+
+async function migrateAnonymousPreferences(profile, preferences) {
+  const pending = pendingAccountMigration();
+  if (!pending) {
+    return { profile, preferences };
+  }
+  if (preferences.companies.length && !pending.preferencesMigrated) {
+    localStorage.removeItem(ACCOUNT_MIGRATION_KEY);
+    return { profile, preferences };
+  }
+
+  let migratedPreferences = preferences;
+  let migratedProfile = profile;
+  if (!pending.preferencesMigrated) {
+    const { data, error } = await client
+      .from("preferences")
+      .update(pending.preferences)
+      .eq("user_id", currentUser.id)
+      .select()
+      .single();
+    if (error) {
+      throw error;
+    }
+    migratedPreferences = data;
+    pending.preferencesMigrated = true;
+    localStorage.setItem(ACCOUNT_MIGRATION_KEY, JSON.stringify(pending));
+  }
+  if (!pending.profileMigrated) {
+    const { data, error } = await client
+      .from("profiles")
+      .update(pending.profile)
+      .eq("id", currentUser.id)
+      .select()
+      .single();
+    if (error) {
+      throw error;
+    }
+    migratedProfile = data;
+    pending.profileMigrated = true;
+    localStorage.setItem(ACCOUNT_MIGRATION_KEY, JSON.stringify(pending));
+  }
+  localStorage.removeItem(ACCOUNT_MIGRATION_KEY);
+  return {
+    profile: migratedProfile,
+    preferences: migratedPreferences,
+  };
+}
+
+async function registeredSession(session) {
+  if (!session?.user?.is_anonymous) {
+    return session;
+  }
+  await preserveAnonymousPreferences(session.user);
+  const { error } = await client.auth.signOut({ scope: "local" });
+  if (error) {
+    throw error;
+  }
+  return null;
 }
 
 async function handleSession(session) {
   currentUser = session?.user || null;
-  if (!currentUser) {
-    const { data, error } = await client.auth.signInAnonymously();
-    if (error) {
-      throw error;
+  if (!isSignedIn()) {
+    try {
+      await logoutOneSignal();
+    } catch (error) {
+      console.error(error);
     }
-    currentUser = data.user;
+    currentProfile = null;
+    currentPreferences = null;
+    renderAccount();
+    return;
   }
 
   await loginOneSignal(currentUser);
-  const [{ data: profile, error: profileError }, { data: preferences, error: preferenceError }] =
+  const [{ data: storedProfile, error: profileError }, { data: storedPreferences, error: preferenceError }] =
     await Promise.all([
       client.from("profiles").select("*").eq("id", currentUser.id).single(),
       client
@@ -306,6 +480,10 @@ async function handleSession(session) {
   if (preferenceError) {
     throw preferenceError;
   }
+  const { profile, preferences } = await migrateAnonymousPreferences(
+    storedProfile,
+    storedPreferences,
+  );
 
   const ui = await jobAlertsUI();
   populateAdvancedPreferences(preferences, profile);
@@ -344,15 +522,22 @@ async function initializeSupabase() {
   if (error) {
     throw error;
   }
-  await handleSession(data.session);
+  const session = await registeredSession(data.session);
+  await handleSession(session);
   readyResolve();
 
   client.auth.onAuthStateChange((_event, session) => {
     setTimeout(() => {
-      handleSession(session).catch((sessionError) => {
-        console.error(sessionError);
-        setText(elements.accountStatus, "Account synchronization failed.", true);
-      });
+      registeredSession(session)
+        .then(handleSession)
+        .catch((sessionError) => {
+          console.error(sessionError);
+          setText(
+            elements.accountStatus,
+            "Account synchronization failed.",
+            true,
+          );
+        });
     }, 0);
   });
 }
@@ -790,7 +975,25 @@ async function uploadResume() {
 elements.accountButton.addEventListener("click", () =>
   elements.accountDialog.showModal(),
 );
+elements.accountDialog.addEventListener("cancel", (event) => {
+  if (!isSignedIn()) {
+    event.preventDefault();
+  }
+});
+elements.accountForm.addEventListener("submit", (event) => {
+  if (isSignedIn()) {
+    return;
+  }
+  event.preventDefault();
+  if (!elements.magicLinkSignin.disabled) {
+    elements.magicLinkSignin.click();
+  }
+});
 elements.googleSignin.addEventListener("click", async () => {
+  if (!config.googleAuthEnabled) {
+    setText(elements.accountStatus, "Google sign-in is not configured.", true);
+    return;
+  }
   const { error } = await client.auth.signInWithOAuth({
     provider: "google",
     options: { redirectTo: window.location.origin },
@@ -817,7 +1020,6 @@ elements.magicLinkSignin.addEventListener("click", async () => {
 });
 elements.signoutButton.addEventListener("click", async () => {
   await client.auth.signOut();
-  elements.accountDialog.close();
 });
 for (const button of elements.navButtons) {
   button.addEventListener("click", () => showView(button.dataset.view));
@@ -850,5 +1052,19 @@ showView(location.hash.slice(1) || "alerts");
 initializeSupabase().catch((error) => {
   console.error(error);
   readyResolve();
+  document.body.classList.add("auth-required");
+  elements.accountClose.classList.add("hidden");
+  elements.signedOutControls.classList.remove("hidden");
+  elements.signoutButton.classList.add("hidden");
+  elements.googleSignin.disabled = true;
+  elements.magicLinkSignin.disabled = true;
+  if (!elements.accountDialog.open) {
+    elements.accountDialog.showModal();
+  }
+  setText(
+    elements.accountStatus,
+    "Job Alerts could not connect. Reload the page to retry.",
+    true,
+  );
   setText(elements.accountButton, "Connection failed", true);
 });

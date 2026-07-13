@@ -1,11 +1,28 @@
 :root {
-  color-scheme: light;
+  color-scheme: dark;
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
-  color: #111827;
-  background: #f6f8fc;
+  color: #f4f7fc;
+  background: #080b12;
   font-synthesis: none;
+  --bg: #080b12;
+  --header: rgba(8, 11, 18, 0.9);
+  --surface: #101722;
+  --surface-raised: #151e2d;
+  --surface-soft: #1a2435;
+  --surface-accent: #17244a;
+  --text: #f4f7fc;
+  --text-strong: #ffffff;
+  --muted: #9aa7bb;
+  --muted-soft: #7f8ba0;
+  --border: #273349;
+  --border-strong: #3a4965;
+  --accent: #7891ff;
+  --accent-strong: #465fcf;
+  --accent-hover: #3d55bd;
+  --warning-border: #ad7a2f;
+  --warning-bg: #291f0f;
 }
 
 * {
@@ -16,8 +33,13 @@ body {
   margin: 0;
   min-width: 320px;
   background:
-    radial-gradient(circle at top left, rgba(79, 124, 255, 0.12), transparent 32rem),
-    #f6f8fc;
+    radial-gradient(circle at top left, rgba(82, 111, 231, 0.2), transparent 34rem),
+    var(--bg);
+}
+
+body.auth-required .app-header,
+body.auth-required main > :not(#account-dialog) {
+  visibility: hidden;
 }
 
 .app-header {
@@ -30,13 +52,13 @@ body {
   gap: 24px;
   min-height: 68px;
   padding: 10px max(18px, calc((100vw - 920px) / 2));
-  border-bottom: 1px solid rgba(209, 216, 229, 0.9);
-  background: rgba(246, 248, 252, 0.9);
+  border-bottom: 1px solid rgba(58, 73, 101, 0.72);
+  background: var(--header);
   backdrop-filter: blur(18px);
 }
 
 .brand {
-  color: #111827;
+  color: var(--text-strong);
   font-size: 1.05rem;
   font-weight: 850;
   text-decoration: none;
@@ -52,7 +74,7 @@ body {
   padding: 9px 12px;
   border: 0;
   border-radius: 9px;
-  color: #667085;
+  color: var(--muted);
   background: transparent;
   font-size: 0.9rem;
   font-weight: 700;
@@ -60,8 +82,8 @@ body {
 
 .nav-button.active,
 .nav-button:hover {
-  color: #1f2937;
-  background: #e8edfa;
+  color: var(--text-strong);
+  background: var(--surface-soft);
 }
 
 button,
@@ -79,7 +101,7 @@ button:disabled {
 }
 
 a {
-  color: #315cdb;
+  color: var(--accent);
 }
 
 .shell {
@@ -95,7 +117,7 @@ a {
 
 .eyebrow,
 .step {
-  color: #315cdb;
+  color: var(--accent);
   font-size: 0.78rem;
   font-weight: 800;
   letter-spacing: 0.1em;
@@ -118,7 +140,7 @@ h1 {
 
 .hero p {
   max-width: 680px;
-  color: #4b5563;
+  color: var(--muted);
   font-size: 1.12rem;
   line-height: 1.7;
 }
@@ -132,10 +154,10 @@ h2 {
 .card,
 .notice {
   margin-bottom: 20px;
-  border: 1px solid #dfe5f0;
+  border: 1px solid var(--border);
   border-radius: 22px;
-  background: rgba(255, 255, 255, 0.92);
-  box-shadow: 0 18px 50px rgba(30, 48, 82, 0.08);
+  background: rgba(16, 23, 34, 0.94);
+  box-shadow: 0 18px 55px rgba(0, 0, 0, 0.28);
 }
 
 .card {
@@ -144,8 +166,8 @@ h2 {
 
 .notice {
   padding: 18px 22px;
-  border-color: #f4c86b;
-  background: #fff8e6;
+  border-color: var(--warning-border);
+  background: var(--warning-bg);
   line-height: 1.55;
 }
 
@@ -160,7 +182,7 @@ h2 {
 
 .muted {
   margin-bottom: 0;
-  color: #667085;
+  color: var(--muted);
   line-height: 1.5;
 }
 
@@ -189,26 +211,26 @@ h2 {
 }
 
 .button.primary {
-  color: #fff;
-  background: #315cdb;
+  color: var(--text-strong);
+  background: var(--accent-strong);
 }
 
 .button.primary:hover:not(:disabled) {
-  background: #244cc3;
+  background: var(--accent-hover);
 }
 
 .button.secondary {
-  color: #1f2937;
-  border: 1px solid #d1d8e5;
-  background: #fff;
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-raised);
 }
 
 .count {
   flex: none;
   padding: 7px 11px;
   border-radius: 999px;
-  color: #315cdb;
-  background: #eef2ff;
+  color: var(--accent);
+  background: var(--surface-accent);
   font-size: 0.85rem;
   font-weight: 750;
 }
@@ -222,15 +244,16 @@ h2 {
   width: 100%;
   height: 50px;
   padding: 0 16px;
-  border: 1px solid #d1d8e5;
+  border: 1px solid var(--border-strong);
   border-radius: 12px;
   outline: none;
-  background: #fff;
+  color: var(--text);
+  background: var(--surface-raised);
 }
 
 .search input:focus {
-  border-color: #4f7cff;
-  box-shadow: 0 0 0 4px rgba(79, 124, 255, 0.13);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px rgba(120, 145, 255, 0.16);
 }
 
 .preference-actions {
@@ -256,13 +279,13 @@ h2 {
   display: grid;
   gap: 7px;
   min-width: 0;
-  color: #374151;
+  color: var(--text);
   font-size: 0.9rem;
   font-weight: 700;
 }
 
 .field small {
-  color: #7b8494;
+  color: var(--muted-soft);
   font-size: 0.78rem;
   font-weight: 500;
 }
@@ -274,11 +297,11 @@ h2 {
   width: 100%;
   min-height: 44px;
   padding: 9px 12px;
-  border: 1px solid #d1d8e5;
+  border: 1px solid var(--border-strong);
   border-radius: 10px;
   outline: none;
-  color: #111827;
-  background: #fff;
+  color: var(--text);
+  background: var(--surface-raised);
 }
 
 .field textarea {
@@ -289,8 +312,8 @@ h2 {
 .field select:focus,
 .field textarea:focus,
 .inline-form input:focus {
-  border-color: #4f7cff;
-  box-shadow: 0 0 0 4px rgba(79, 124, 255, 0.13);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px rgba(120, 145, 255, 0.16);
 }
 
 .field.span-2 {
@@ -312,10 +335,10 @@ fieldset.field {
 .chip-options label,
 .chip-options > span {
   padding: 8px 11px;
-  border: 1px solid #dfe5f0;
+  border: 1px solid var(--border);
   border-radius: 999px;
-  color: #374151;
-  background: #fff;
+  color: var(--text);
+  background: var(--surface-raised);
   font-size: 0.83rem;
   font-weight: 650;
 }
@@ -365,9 +388,9 @@ fieldset.field {
   display: grid;
   gap: 8px;
   padding: 16px;
-  border: 1px solid #e2e7f0;
+  border: 1px solid var(--border);
   border-radius: 13px;
-  background: #fff;
+  background: var(--surface-raised);
 }
 
 .job-card {
@@ -380,7 +403,7 @@ fieldset.field {
 }
 
 .job-meta {
-  color: #667085;
+  color: var(--muted);
   font-size: 0.84rem;
 }
 
@@ -394,10 +417,10 @@ fieldset.field {
   gap: 20px;
   margin: 24px 0;
   padding: 16px 18px;
-  border: 1px solid #d5dceb;
+  border: 1px solid var(--border-strong);
   border-radius: 16px;
-  background: rgba(255, 255, 255, 0.94);
-  box-shadow: 0 16px 44px rgba(30, 48, 82, 0.14);
+  background: rgba(16, 23, 34, 0.95);
+  box-shadow: 0 16px 44px rgba(0, 0, 0, 0.34);
   backdrop-filter: blur(16px);
 }
 
@@ -423,9 +446,9 @@ fieldset.field {
 
 .summary-card {
   padding: 14px;
-  border: 1px solid #dfe5f0;
+  border: 1px solid var(--border);
   border-radius: 13px;
-  background: #fff;
+  background: var(--surface-raised);
 }
 
 .summary-card strong {
@@ -434,7 +457,7 @@ fieldset.field {
 }
 
 .summary-card span {
-  color: #667085;
+  color: var(--muted);
   font-size: 0.75rem;
   text-transform: capitalize;
 }
@@ -445,9 +468,9 @@ fieldset.field {
   gap: 6px;
   min-height: 190px;
   margin: 22px 0;
-  border: 2px dashed #b9c6e8;
+  border: 2px dashed var(--border-strong);
   border-radius: 16px;
-  background: #f8faff;
+  background: var(--surface-raised);
   text-align: center;
 }
 
@@ -459,7 +482,7 @@ fieldset.field {
 }
 
 .upload-zone span {
-  color: #667085;
+  color: var(--muted);
   font-size: 0.85rem;
 }
 
@@ -468,11 +491,13 @@ dialog {
   padding: 0;
   border: 0;
   border-radius: 20px;
-  box-shadow: 0 30px 100px rgba(17, 24, 39, 0.3);
+  color: var(--text);
+  background: var(--surface);
+  box-shadow: 0 30px 100px rgba(0, 0, 0, 0.68);
 }
 
 dialog::backdrop {
-  background: rgba(17, 24, 39, 0.5);
+  background: rgba(3, 5, 9, 0.82);
   backdrop-filter: blur(4px);
 }
 
@@ -491,7 +516,8 @@ dialog::backdrop {
   height: 34px;
   border: 0;
   border-radius: 50%;
-  background: #eef1f6;
+  color: var(--text);
+  background: var(--surface-soft);
   font-size: 1.3rem;
 }
 
@@ -499,7 +525,7 @@ dialog::backdrop {
   display: flex;
   align-items: center;
   gap: 10px;
-  color: #98a2b3;
+  color: var(--muted);
   font-size: 0.8rem;
 }
 
@@ -508,7 +534,7 @@ dialog::backdrop {
   content: "";
   flex: 1;
   height: 1px;
-  background: #e2e7f0;
+  background: var(--border);
 }
 
 .track-option {
@@ -516,21 +542,21 @@ dialog::backdrop {
   align-items: flex-start;
   gap: 12px;
   padding: 18px;
-  border: 1px solid #dfe5f0;
+  border: 1px solid var(--border);
   border-radius: 14px;
-  background: #fff;
+  background: var(--surface-raised);
 }
 
 .track-option:has(input:checked) {
-  border-color: #7394f8;
-  background: #f0f4ff;
+  border-color: var(--accent);
+  background: var(--surface-accent);
 }
 
 .track-option input {
   width: 18px;
   height: 18px;
   margin-top: 2px;
-  accent-color: #315cdb;
+  accent-color: var(--accent);
 }
 
 .track-option span,
@@ -540,14 +566,14 @@ dialog::backdrop {
 
 .track-option small {
   margin-top: 5px;
-  color: #667085;
+  color: var(--muted);
   line-height: 1.4;
 }
 
 .text-button {
   padding: 6px 3px;
   border: 0;
-  color: #315cdb;
+  color: var(--accent);
   background: transparent;
   font-size: 0.9rem;
   font-weight: 700;
@@ -568,32 +594,32 @@ dialog::backdrop {
   gap: 10px;
   min-height: 48px;
   padding: 10px 12px;
-  border: 1px solid #e2e7f0;
+  border: 1px solid var(--border);
   border-radius: 11px;
-  background: #fff;
+  background: var(--surface-raised);
   font-size: 0.92rem;
 }
 
 .company-option:has(input:checked) {
-  border-color: #7394f8;
-  background: #f0f4ff;
+  border-color: var(--accent);
+  background: var(--surface-accent);
 }
 
 .company-option input {
   width: 17px;
   height: 17px;
-  accent-color: #315cdb;
+  accent-color: var(--accent);
 }
 
 .save-row {
   margin-top: 24px;
   padding-top: 20px;
-  border-top: 1px solid #e7eaf0;
+  border-top: 1px solid var(--border);
 }
 
 footer {
   padding: 20px 4px 0;
-  color: #667085;
+  color: var(--muted);
   font-size: 0.85rem;
   text-align: center;
 }

@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="theme-color" content="#111827">
+    <meta name="theme-color" content="#080b12">
     <meta
       name="description"
       content="Choose companies and receive push notifications when new graduate jobs are posted."
@@ -28,7 +28,7 @@
     <script type="module" src="supabase-app.js"></script>
     <title>New Grad Job Alerts</title>
   </head>
-  <body>
+  <body class="auth-required">
     <header class="app-header">
       <a class="brand" href="#alerts">Job Alerts</a>
       <nav class="app-nav" aria-label="Primary navigation">
@@ -276,11 +276,11 @@
       </section>
 
       <dialog id="account-dialog">
-        <form method="dialog" class="dialog-card">
-          <button class="dialog-close" type="submit" value="cancel" aria-label="Close">×</button>
+        <form id="account-form" method="dialog" class="dialog-card">
+          <button id="account-close" class="dialog-close hidden" type="submit" value="cancel" aria-label="Close">×</button>
           <div class="eyebrow">Account</div>
-          <h2 id="account-heading">Sync across devices</h2>
-          <p id="account-status" class="muted">Loading account...</p>
+          <h2 id="account-heading">Sign in to Job Alerts</h2>
+          <p id="account-status" class="muted">An account is required to continue.</p>
           <div id="signed-out-controls">
             <button id="google-signin" class="button secondary full" type="button">Continue with Google</button>
             <div id="google-divider" class="divider">or</div>

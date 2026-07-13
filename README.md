@@ -6,11 +6,11 @@ the [`New-Grad-2027`](https://github.com/vanshb03/New-Grad-2027) and
 trackers, plus selected Greenhouse, Lever, Ashby, and Workday career sites.
 
 Supabase stores each user's filters, job applications, ATS monitors, and
-private resume profile. OneSignal subscriptions use the Supabase user ID as
-their external ID, so notification targeting does not depend on Data Tags.
-Guest profiles work without an account. Email sign-in syncs a permanent
-profile across devices and transfers local selections for new accounts. The
-Google button is feature-gated until Google OAuth credentials are configured.
+private resume profile. An account is required. Google OAuth and email sign-in
+sync preferences across devices, and OneSignal subscriptions use the Supabase
+user ID as their external ID so targeting does not depend on Data Tags.
+
+The interface uses a dark color scheme by default.
 
 ## OneSignal setup
 
