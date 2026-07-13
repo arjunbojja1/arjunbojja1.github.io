@@ -205,8 +205,7 @@ function collectAdvancedPreferences() {
   };
 }
 
-async function savePreferences(basicPreferences) {
-  await ready;
+async function persistPreferences(basicPreferences) {
   if (!currentUser) {
     throw new Error("Supabase session is not ready.");
   }
@@ -250,6 +249,11 @@ async function savePreferences(basicPreferences) {
   }
   currentPreferences = preferences;
   currentProfile = profile;
+}
+
+async function savePreferences(basicPreferences) {
+  await ready;
+  return persistPreferences(basicPreferences);
 }
 
 window.JobAlertsData = { savePreferences };
@@ -311,7 +315,7 @@ async function handleSession(session) {
 
   const local = ui.getBasicPreferences();
   if (!preferences.companies.length && local?.companies.length) {
-    await savePreferences(local);
+    await persistPreferences(local);
   }
 }
 
@@ -340,8 +344,8 @@ async function initializeSupabase() {
   if (error) {
     throw error;
   }
-  readyResolve();
   await handleSession(data.session);
+  readyResolve();
 
   client.auth.onAuthStateChange((_event, session) => {
     setTimeout(() => {

@@ -72,6 +72,11 @@ test("initializes push and saves personalized companies", async ({}, testInfo) =
       id: expect.any(String),
       token: expect.stringContaining("https://fcm.googleapis.com/"),
     });
+  await expect
+    .poll(() => page.evaluate(() => window.OneSignal?.User?.externalId))
+    .toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+    );
 
   await page.locator("#save-button").click();
   await expect(page.locator("#save-status")).toHaveText(
