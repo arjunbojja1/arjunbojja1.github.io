@@ -39,6 +39,9 @@ test("initializes push and saves personalized companies", async ({}, testInfo) =
     waitUntil: "domcontentloaded",
   });
 
+  await expect(page.locator("#account-button")).toHaveText(/Guest|@/, {
+    timeout: 20_000,
+  });
   const notificationStatus = page.locator("#notification-status");
   await expect(notificationStatus).toHaveText(
     /Notifications are off|Push notifications are active/,
@@ -47,7 +50,8 @@ test("initializes push and saves personalized companies", async ({}, testInfo) =
 
   await page.locator("#recommended-button").click();
   await expect(page.locator("#selection-count")).toHaveText("39 selected");
-  await page.locator('input[name="track"][value="internship"]').check();
+  await page.locator('input[name="track[]"][value="internship"]').check();
+  await page.locator("#locations-input").fill("Bay Area, Remote");
 
   const enableButton = page.locator("#enable-button");
   if (await enableButton.isEnabled()) {
@@ -74,14 +78,16 @@ test("initializes push and saves personalized companies", async ({}, testInfo) =
     "Preferences saved. Your alerts are active.",
     { timeout: 10_000 },
   );
-  await expect
-    .poll(() =>
-      page.evaluate(() => window.OneSignal?.User?.getTags?.()),
-    )
-    .toMatchObject({
-      track_new_grad: "1",
-      track_internship: "1",
-    });
+  await page.reload({ waitUntil: "domcontentloaded" });
+  await expect(page.locator("#selection-count")).toHaveText("39 selected", {
+    timeout: 20_000,
+  });
+  await expect(
+    page.locator('input[name="track[]"][value="internship"]'),
+  ).toBeChecked();
+  await expect(page.locator("#locations-input")).toHaveValue(
+    "Bay Area, Remote",
+  );
 
   const registrationUrls = await page.evaluate(async () => {
     const registrations = await navigator.serviceWorker.getRegistrations();

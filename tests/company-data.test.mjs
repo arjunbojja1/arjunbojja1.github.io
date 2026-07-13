@@ -46,10 +46,12 @@ test("reports source HTTP errors", async () => {
   await assert.rejects(() => fetchCompanies(fakeFetch), /HTTP 503/);
 });
 
-test("merges companies from both trackers", async () => {
+test("merges companies from all trackers", async () => {
   const readmes = [
     README,
     README.replace("Google", "Microsoft").replace("Scale", "Stripe"),
+    README.replace("Google", "Databricks"),
+    README.replace("Google", "Cloudflare"),
   ];
   let request = 0;
   const fakeFetch = async () => ({

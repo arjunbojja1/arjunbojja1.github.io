@@ -5,9 +5,19 @@ export const SOURCES = [
     url: "https://raw.githubusercontent.com/vanshb03/New-Grad-2027/dev/README.md",
   },
   {
+    key: "canada_new_grad",
+    label: "Canada new grad roles",
+    url: "https://raw.githubusercontent.com/vanshb03/New-Grad-2027/dev/Canada.md",
+  },
+  {
     key: "internship",
     label: "Summer 2027 internships",
     url: "https://raw.githubusercontent.com/vanshb03/Summer2027-Internships/dev/README.md",
+  },
+  {
+    key: "offseason_internship",
+    label: "Off-season internships",
+    url: "https://raw.githubusercontent.com/vanshb03/Summer2027-Internships/dev/OFFSEASON_README.md",
   },
 ];
 

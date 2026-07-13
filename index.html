@@ -1,4 +1,4 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="utf-8">
@@ -20,122 +20,295 @@
       src="https://cdn.onesignal.com/sdks/web/v16/OneSignalSDK.page.js"
       defer
     ></script>
+    <script
+      src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.110.2/dist/umd/supabase.min.js"
+      defer
+    ></script>
     <script type="module" src="app.js"></script>
+    <script type="module" src="supabase-app.js"></script>
     <title>New Grad Job Alerts</title>
   </head>
   <body>
+    <header class="app-header">
+      <a class="brand" href="#alerts">Job Alerts</a>
+      <nav class="app-nav" aria-label="Primary navigation">
+        <button class="nav-button active" data-view="alerts" type="button">Alerts</button>
+        <button class="nav-button" data-view="jobs" type="button">Jobs</button>
+        <button class="nav-button" data-view="applications" type="button">Applications</button>
+        <button class="nav-button" data-view="resume" type="button">Resume</button>
+      </nav>
+      <button id="account-button" class="button secondary compact" type="button">
+        Connecting...
+      </button>
+    </header>
+
     <main class="shell">
-      <header class="hero">
-        <div class="eyebrow">New Grad Job Alerts</div>
-        <h1>Be early to the roles you want.</h1>
-        <p>
-          Pick companies, enable notifications, and get a direct link whenever
-          a matching job is added to the New-Grad-2027 tracker.
-        </p>
-      </header>
-
-      <section id="ios-install" class="notice hidden" aria-live="polite">
-        <strong>Install on iPhone first.</strong>
-        Open this page in Safari, tap Share, choose Add to Home Screen, then
-        launch Job Alerts from the new icon.
-      </section>
-
-      <section class="card setup-card" aria-labelledby="setup-heading">
-        <div>
-          <span class="step">Step 1</span>
-          <h2 id="setup-heading">Enable push notifications</h2>
-          <p id="notification-status" class="muted" aria-live="polite">
-            Checking notification support...
+      <section id="view-alerts" class="app-view">
+        <header class="hero">
+          <div class="eyebrow">Personalized job discovery</div>
+          <h1>Be early to the roles you want.</h1>
+          <p>
+            Monitor public trackers and selected company career sites, then
+            receive alerts filtered to your role, location, and eligibility.
           </p>
-        </div>
-        <div class="button-row">
-          <button id="install-button" class="button secondary hidden" type="button">
-            Install app
-          </button>
-          <button id="enable-button" class="button primary" type="button">
-            Enable notifications
-          </button>
-        </div>
-      </section>
+        </header>
 
-      <section class="card" aria-labelledby="tracks-heading">
-        <div>
-          <span class="step">Step 2</span>
-          <h2 id="tracks-heading">Choose alert types</h2>
-          <p class="muted">Select one or both job trackers.</p>
-        </div>
-        <div class="track-options">
-          <label class="track-option">
-            <input
-              type="checkbox"
-              name="track"
-              value="new_grad"
-              checked
-            >
-            <span>
-              <strong>New grad roles</strong>
-              <small>Entry-level roles from New-Grad-2027</small>
-            </span>
-          </label>
-          <label class="track-option">
-            <input type="checkbox" name="track" value="internship">
-            <span>
-              <strong>Summer 2027 internships</strong>
-              <small>Internships and co-ops from Summer2027-Internships</small>
-            </span>
-          </label>
-        </div>
-      </section>
+        <section id="ios-install" class="notice hidden" aria-live="polite">
+          <strong>Install on iPhone first.</strong>
+          Open this page in Safari, tap Share, choose Add to Home Screen, then
+          launch Job Alerts from the new icon.
+        </section>
 
-      <section class="card" aria-labelledby="companies-heading">
-        <div class="section-heading">
+        <section class="card setup-card" aria-labelledby="setup-heading">
           <div>
-            <span class="step">Step 3</span>
-            <h2 id="companies-heading">Choose companies</h2>
-            <p class="muted">
-              Select up to 50. Your choices stay attached to this browser.
+            <span class="step">Step 1</span>
+            <h2 id="setup-heading">Enable push notifications</h2>
+            <p id="notification-status" class="muted" aria-live="polite">
+              Checking notification support...
             </p>
           </div>
-          <span id="selection-count" class="count">0 selected</span>
-        </div>
+          <div class="button-row">
+            <button id="install-button" class="button secondary hidden" type="button">
+              Install app
+            </button>
+            <button id="enable-button" class="button primary" type="button">
+              Enable notifications
+            </button>
+          </div>
+        </section>
 
-        <label class="search">
-          <span class="sr-only">Search companies</span>
-          <input
-            id="company-search"
-            type="search"
-            placeholder="Search companies"
-            autocomplete="off"
-          >
-        </label>
+        <section class="card" aria-labelledby="tracks-heading">
+          <div>
+            <span class="step">Step 2</span>
+            <h2 id="tracks-heading">Choose alert types</h2>
+            <p class="muted">Select one or more job trackers.</p>
+          </div>
+          <div class="track-options">
+            <label class="track-option">
+              <input type="checkbox" name="track[]" value="new_grad" checked>
+              <span><strong>US new grad</strong><small>New-Grad-2027</small></span>
+            </label>
+            <label class="track-option">
+              <input type="checkbox" name="track[]" value="canada_new_grad">
+              <span><strong>Canada new grad</strong><small>Canadian entry-level roles</small></span>
+            </label>
+            <label class="track-option">
+              <input type="checkbox" name="track[]" value="internship">
+              <span><strong>Summer 2027 internships</strong><small>Internships and co-ops</small></span>
+            </label>
+            <label class="track-option">
+              <input type="checkbox" name="track[]" value="offseason_internship">
+              <span><strong>Off-season internships</strong><small>Fall, winter, and spring roles</small></span>
+            </label>
+            <label class="track-option">
+              <input type="checkbox" name="track[]" value="ats">
+              <span><strong>Company career sites</strong><small>Your Greenhouse, Lever, Ashby, and Workday monitors</small></span>
+            </label>
+          </div>
+        </section>
 
-        <div class="preference-actions">
-          <button id="recommended-button" class="text-button" type="button">
-            Select recommended 39
-          </button>
-          <button id="clear-button" class="text-button" type="button">
-            Clear all
-          </button>
-        </div>
+        <section class="card" aria-labelledby="companies-heading">
+          <div class="section-heading">
+            <div>
+              <span class="step">Step 3</span>
+              <h2 id="companies-heading">Choose companies</h2>
+              <p class="muted">Select up to 50 companies.</p>
+            </div>
+            <span id="selection-count" class="count">0 selected</span>
+          </div>
 
-        <div id="company-list" class="company-list" aria-live="polite">
-          <p class="muted">Loading companies...</p>
-        </div>
+          <label class="search">
+            <span class="sr-only">Search companies</span>
+            <input id="company-search" type="search" placeholder="Search companies" autocomplete="off">
+          </label>
 
-        <div class="save-row">
-          <p id="save-status" class="muted" aria-live="polite">
-            Choose companies, then save your preferences.
-          </p>
-          <button id="save-button" class="button primary" type="button">
-            Save preferences
-          </button>
+          <div class="preference-actions">
+            <button id="recommended-button" class="text-button" type="button">Select recommended 39</button>
+            <button id="clear-button" class="text-button" type="button">Clear all</button>
+          </div>
+          <div id="company-list" class="company-list" aria-live="polite">
+            <p class="muted">Loading companies...</p>
+          </div>
+        </section>
+
+        <section class="card" aria-labelledby="filters-heading">
+          <span class="step">Step 4</span>
+          <h2 id="filters-heading">Refine your alerts</h2>
+          <div class="form-grid">
+            <label class="field span-2">
+              <span>Locations</span>
+              <input id="locations-input" type="text" placeholder="Bay Area, New York, Remote">
+              <small>Comma-separated; leave blank for anywhere.</small>
+            </label>
+            <label class="field">
+              <span>Eligibility</span>
+              <select id="eligibility-select">
+                <option value="any">Show all roles</option>
+                <option value="sponsorship">Require sponsorship-friendly roles</option>
+                <option value="no_citizenship">Hide citizenship-required roles</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Work arrangement</span>
+              <select id="remote-select">
+                <option value="any">Remote or onsite</option>
+                <option value="remote">Remote only</option>
+              </select>
+            </label>
+            <fieldset class="field span-2">
+              <legend>Role categories</legend>
+              <div class="chip-options">
+                <label><input type="checkbox" name="role-category[]" value="software"> Software</label>
+                <label><input type="checkbox" name="role-category[]" value="data"> Data</label>
+                <label><input type="checkbox" name="role-category[]" value="ai_ml"> AI / ML</label>
+                <label><input type="checkbox" name="role-category[]" value="product"> Product</label>
+                <label><input type="checkbox" name="role-category[]" value="quant"> Quant</label>
+                <label><input type="checkbox" name="role-category[]" value="security"> Security</label>
+                <label><input type="checkbox" name="role-category[]" value="hardware"> Hardware</label>
+              </div>
+            </fieldset>
+            <label class="field">
+              <span>Include keywords</span>
+              <input id="include-keywords" type="text" placeholder="backend, distributed systems">
+            </label>
+            <label class="field">
+              <span>Exclude keywords</span>
+              <input id="exclude-keywords" type="text" placeholder="senior, hardware">
+            </label>
+            <div class="field">
+              <label for="minimum-score">Minimum resume match</label>
+              <div class="range-row">
+                <input id="minimum-score" type="range" min="0" max="100" step="5" value="0">
+                <output id="minimum-score-output" for="minimum-score">0%</output>
+              </div>
+            </div>
+            <label class="field checkbox-field">
+              <input id="closure-alerts" type="checkbox" checked>
+              <span>Notify me when saved roles close</span>
+            </label>
+          </div>
+        </section>
+
+        <section class="card" aria-labelledby="delivery-heading">
+          <span class="step">Step 5</span>
+          <h2 id="delivery-heading">Control delivery</h2>
+          <div class="form-grid">
+            <label class="field">
+              <span>Frequency</span>
+              <select id="delivery-mode">
+                <option value="instant">Instant</option>
+                <option value="daily">Daily digest</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Timezone</span>
+              <input id="timezone-input" type="text" placeholder="America/Los_Angeles">
+            </label>
+            <label class="field">
+              <span>Digest hour</span>
+              <select id="digest-hour"></select>
+            </label>
+            <label class="field">
+              <span>Quiet hours start</span>
+              <input id="quiet-start" type="time">
+            </label>
+            <label class="field">
+              <span>Quiet hours end</span>
+              <input id="quiet-end" type="time">
+            </label>
+          </div>
+        </section>
+
+        <section class="card" aria-labelledby="monitors-heading">
+          <span class="step">Step 6</span>
+          <h2 id="monitors-heading">Monitor a company career site</h2>
+          <p class="muted">Add a public Greenhouse, Lever, Ashby, or Workday career URL.</p>
+          <form id="monitor-form" class="inline-form">
+            <input id="monitor-company" type="text" required placeholder="Company name">
+            <input id="monitor-url" type="url" required placeholder="https://jobs.ashbyhq.com/company">
+            <button class="button secondary" type="submit">Add monitor</button>
+          </form>
+          <div id="monitor-list" class="stack-list"></div>
+        </section>
+
+        <div class="sticky-save">
+          <p id="save-status" class="muted" aria-live="polite">Choose your preferences, then save.</p>
+          <button id="save-button" class="button primary" type="button">Save preferences</button>
         </div>
       </section>
 
+      <section id="view-jobs" class="app-view hidden">
+        <header class="page-heading">
+          <div><div class="eyebrow">Live opportunities</div><h1>Job feed</h1></div>
+          <button id="refresh-jobs" class="button secondary" type="button">Refresh</button>
+        </header>
+        <div class="card">
+          <label class="search"><span class="sr-only">Search jobs</span><input id="job-search" type="search" placeholder="Search title, company, or location"></label>
+          <div id="job-list" class="job-list"><p class="muted">Loading jobs...</p></div>
+        </div>
+      </section>
+
+      <section id="view-applications" class="app-view hidden">
+        <header class="page-heading">
+          <div><div class="eyebrow">Stay organized</div><h1>Applications</h1></div>
+          <button id="add-application-button" class="button primary" type="button">Add application</button>
+        </header>
+        <div id="application-summary" class="summary-grid"></div>
+        <div class="card">
+          <div id="application-list" class="stack-list"><p class="muted">Sign in to track applications.</p></div>
+        </div>
+      </section>
+
+      <section id="view-resume" class="app-view hidden">
+        <header class="page-heading">
+          <div><div class="eyebrow">Private recommendations</div><h1>Resume profile</h1></div>
+        </header>
+        <div class="card">
+          <p>Your PDF is stored in a private Supabase bucket. Text extraction and skill detection run in your browser.</p>
+          <label id="resume-drop" class="upload-zone">
+            <input id="resume-file" type="file" accept="application/pdf">
+            <strong>Choose a PDF resume</strong>
+            <span>Maximum 5 MB</span>
+          </label>
+          <p id="resume-status" class="muted" aria-live="polite">No resume uploaded.</p>
+          <div id="resume-skills" class="chip-options"></div>
+        </div>
+      </section>
+
+      <dialog id="account-dialog">
+        <form method="dialog" class="dialog-card">
+          <button class="dialog-close" type="submit" value="cancel" aria-label="Close">×</button>
+          <div class="eyebrow">Account</div>
+          <h2 id="account-heading">Sync across devices</h2>
+          <p id="account-status" class="muted">Loading account...</p>
+          <div id="signed-out-controls">
+            <button id="google-signin" class="button secondary full" type="button">Continue with Google</button>
+            <div id="google-divider" class="divider">or</div>
+            <label class="field"><span>Email</span><input id="auth-email" type="email" placeholder="you@example.com"></label>
+            <button id="magic-link-signin" class="button primary full" type="button">Email me a magic link</button>
+          </div>
+          <button id="signout-button" class="button secondary full hidden" type="button">Sign out</button>
+        </form>
+      </dialog>
+
+      <dialog id="application-dialog">
+        <form id="application-form" class="dialog-card">
+          <button class="dialog-close" type="button" data-close-dialog aria-label="Close">×</button>
+          <h2>Add application</h2>
+          <input id="application-id" type="hidden">
+          <label class="field"><span>Company</span><input id="application-company" type="text" required></label>
+          <label class="field"><span>Role</span><input id="application-title" type="text" required></label>
+          <label class="field"><span>Location</span><input id="application-location" type="text"></label>
+          <label class="field"><span>Job URL</span><input id="application-url" type="url"></label>
+          <label class="field"><span>Status</span><select id="application-status-input"><option value="saved">Saved</option><option value="applied">Applied</option><option value="interview">Interview</option><option value="offer">Offer</option><option value="rejected">Rejected</option><option value="withdrawn">Withdrawn</option></select></label>
+          <label class="field"><span>Notes</span><textarea id="application-notes" rows="4"></textarea></label>
+          <button class="button primary full" type="submit">Save application</button>
+        </form>
+      </dialog>
+
       <footer>
-        Jobs are sourced from
-        <a href="https://github.com/vanshb03/New-Grad-2027">New-Grad-2027</a>.
-        Notification preferences are stored by OneSignal.
+        Jobs are sourced from public trackers and public company ATS APIs.
+        Account data and resumes are protected by Supabase Row Level Security.
       </footer>
     </main>
   </body>

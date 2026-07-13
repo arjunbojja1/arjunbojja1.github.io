@@ -12,7 +12,10 @@ const TRACK_STORAGE_KEY = "new-grad-alert-tracks";
 const SYNCED_TRACK_STORAGE_KEY = "new-grad-alert-synced-tracks";
 const TRACK_TAGS = {
   new_grad: "track_new_grad",
+  canada_new_grad: "track_canada_new_grad",
   internship: "track_internship",
+  offseason_internship: "track_offseason_internship",
+  ats: "track_ats",
 };
 
 const elements = {
@@ -27,7 +30,7 @@ const elements = {
   saveStatus: document.querySelector("#save-status"),
   search: document.querySelector("#company-search"),
   selectionCount: document.querySelector("#selection-count"),
-  trackInputs: [...document.querySelectorAll('input[name="track"]')],
+  trackInputs: [...document.querySelectorAll('input[name="track[]"]')],
 };
 
 let companies = [];
@@ -193,42 +196,34 @@ async function syncPreferences() {
     setStatus(elements.saveStatus, "Select at least one company.", true);
     return;
   }
-  if (!isPushActive()) {
-    setStatus(
-      elements.saveStatus,
-      "Saved on this device. Enable notifications to activate alerts.",
-    );
-    return;
-  }
-
   elements.saveButton.disabled = true;
   setStatus(elements.saveStatus, "Syncing preferences...");
   try {
+    if (window.JobAlertsData) {
+      await window.JobAlertsData.savePreferences({
+        companies: [...selected],
+        source_keys: [...selectedTracks],
+      });
+    }
+
     const previouslySynced = readStoredSet(SYNCED_STORAGE_KEY);
-    const removedTags = [...previouslySynced]
-      .filter((company) => !selected.has(company))
-      .map(companyTag);
+    const removedTags = [...previouslySynced].map(companyTag);
     const previouslySyncedTracks = readStoredSet(SYNCED_TRACK_STORAGE_KEY);
     removedTags.push(
-      ...[...previouslySyncedTracks]
-        .filter((track) => !selectedTracks.has(track))
-        .map((track) => TRACK_TAGS[track]),
+      ...[...previouslySyncedTracks].map((track) => TRACK_TAGS[track]),
     );
-    if (removedTags.length) {
+    if (isPushActive() && removedTags.length) {
       await oneSignal.User.removeTags(removedTags);
     }
 
-    const tags = Object.fromEntries(
-      [...selected].map((company) => [companyTag(company), "1"]),
+    writeStoredSet(SYNCED_STORAGE_KEY, new Set());
+    writeStoredSet(SYNCED_TRACK_STORAGE_KEY, new Set());
+    setStatus(
+      elements.saveStatus,
+      isPushActive()
+        ? "Preferences saved. Your alerts are active."
+        : "Preferences saved. Enable notifications to activate alerts.",
     );
-    for (const track of selectedTracks) {
-      tags[TRACK_TAGS[track]] = "1";
-    }
-    await oneSignal.User.addTags(tags);
-
-    writeStoredSet(SYNCED_STORAGE_KEY, selected);
-    writeStoredSet(SYNCED_TRACK_STORAGE_KEY, selectedTracks);
-    setStatus(elements.saveStatus, "Preferences saved. Your alerts are active.");
   } catch (error) {
     console.error(error);
     setStatus(
@@ -385,6 +380,61 @@ async function loadCompanies() {
       true,
     );
   }
+
+  function applyBasicPreferences(preferences) {
+    if (
+      Array.isArray(preferences.companies) &&
+      preferences.companies.length
+    ) {
+      selected = new Set(preferences.companies.slice(0, MAX_SELECTIONS));
+      if (
+        Array.isArray(preferences.source_keys) &&
+        preferences.source_keys.length
+      ) {
+        selectedTracks = new Set(
+          preferences.source_keys.filter((track) => TRACK_TAGS[track]),
+        );
+      }
+    }
+    writeStoredSet(STORAGE_KEY, selected);
+    writeStoredSet(TRACK_STORAGE_KEY, selectedTracks);
+    companies = [...new Set([...companies, ...selected])].sort((left, right) =>
+      left.localeCompare(right),
+    );
+    renderTracks();
+    renderCompanies();
+    renderSelectionCount();
+  }
+
+  window.JobAlertsUI = {
+    applyBasicPreferences,
+    getBasicPreferences: () => ({
+      companies: [...selected],
+      source_keys: [...selectedTracks],
+    }),
+    addCompanyAndTrack: (company, track) => {
+      const name = company.trim();
+      if (!selected.has(name) && selected.size >= MAX_SELECTIONS) {
+        throw new Error(`Choose at most ${MAX_SELECTIONS} companies.`);
+      }
+      selected.add(name);
+      selectedTracks.add(track);
+      companies = [...new Set([...companies, name])].sort((left, right) =>
+        left.localeCompare(right),
+      );
+      writeStoredSet(STORAGE_KEY, selected);
+      writeStoredSet(TRACK_STORAGE_KEY, selectedTracks);
+      renderTracks();
+      renderCompanies();
+      renderSelectionCount();
+      return {
+        companies: [...selected],
+        source_keys: [...selectedTracks],
+      };
+    },
+    isPushActive,
+  };
+  window.dispatchEvent(new Event("job-alerts-ui-ready"));
   companies = [...new Set([...companies, ...selected])].sort((left, right) =>
     left.localeCompare(right),
   );
