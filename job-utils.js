@@ -223,6 +223,8 @@ export function personalizedJobDetails(
   )
     ? 15
     : 0;
+  const sourceMatch = (preferences?.source_keys || []).includes(job.source);
+  const sourceScore = sourceMatch ? 25 : 0;
   const keywordScore = Math.min(
     15,
     (preferences?.include_keywords || []).filter((keyword) => {
@@ -289,6 +291,7 @@ export function personalizedJobDetails(
     resumeScore +
     locationScore +
     roleScore +
+    sourceScore +
     keywordScore +
     remoteScore +
     recencyScore +
@@ -303,6 +306,9 @@ export function personalizedJobDetails(
         ? "Top location preference"
         : `Location preference #${locationIndex + 1}`,
     );
+  }
+  if (sourceMatch) {
+    reasons.push("Selected alert source");
   }
   if (resumeDetails?.reasons.length) {
     reasons.push(...resumeDetails.reasons.slice(0, 2));
@@ -337,6 +343,7 @@ export function personalizedJobDetails(
       resume: resumeScore,
       location: locationScore,
       role: roleScore,
+      source: sourceScore,
       keywords: keywordScore,
       remote: remoteScore,
       recency: recencyScore,
@@ -442,8 +449,12 @@ export function sortJobsRecommended(
   resumeProfile,
   referenceDate = new Date(),
 ) {
+  const selectedSources = new Set(preferences?.source_keys || []);
+  const sourcePriority = (job) => selectedSources.has(job.source) ? 1 : 0;
   return [...jobs].sort(
     (left, right) =>
+      sourcePriority(right) -
+        sourcePriority(left) ||
       personalizedJobScore(
         right,
         preferences,

@@ -195,6 +195,48 @@ test("includes freshness directly in the recommendation score", () => {
   assert.ok(freshScore - staleScore > 55);
 });
 
+test("prioritizes jobs from selected alert sources", () => {
+  const selected = {
+    id: "selected",
+    source: "new_grad",
+    title: "Software Engineer",
+    company: "Example",
+    location: "Remote",
+    role_category: "software",
+    posted_at: "2026-07-10",
+  };
+  const unselected = {
+    ...selected,
+    id: "unselected",
+    source: "ats",
+    title: "Backend Python Engineer",
+    description: "Build distributed systems in Python.",
+    recommendation_terms: ["backend", "python"],
+    posted_at: "2026-07-13",
+  };
+  const preferences = {
+    source_keys: ["new_grad"],
+    role_categories: ["software"],
+  };
+
+  assert.deepEqual(
+    sortJobsRecommended(
+      [unselected, selected],
+      preferences,
+      SOFTWARE_RESUME,
+      new Date("2026-07-14T12:00:00Z"),
+    ).map((job) => job.id),
+    ["selected", "unselected"],
+  );
+  assert.ok(
+    personalizedJobDetails(
+      selected,
+      preferences,
+      SOFTWARE_RESUME,
+    ).reasons.includes("Selected alert source"),
+  );
+});
+
 test("explains eligibility, urgency, verification, and feedback signals", () => {
   const details = personalizedJobDetails(
     {
