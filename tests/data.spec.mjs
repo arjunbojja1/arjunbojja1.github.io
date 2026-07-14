@@ -100,6 +100,7 @@ test("requires an account and defaults to dark mode", async ({ page }) => {
           document.querySelector("#application-analytics") &&
           document.querySelector("#delivery-health-grid") &&
           document.querySelector("#job-min-salary") &&
+          document.querySelector("#job-education-filter") &&
           document.querySelector("#job-eligible-filter"),
       ),
     };

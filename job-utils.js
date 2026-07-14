@@ -387,6 +387,17 @@ export function isLikelyEligible(job, resumeProfile) {
   );
 }
 
+export function matchesEducationFilter(job, filter) {
+  const level = job.education_level || "";
+  if (filter === "exclude_phd") {
+    return level !== "phd";
+  }
+  if (filter === "undergraduate") {
+    return level !== "phd" && level !== "masters";
+  }
+  return true;
+}
+
 export function effectivePostedDate(job, referenceDate = new Date()) {
   if (!job.posted_at) {
     return null;

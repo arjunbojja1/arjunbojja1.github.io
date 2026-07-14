@@ -5,6 +5,7 @@ import {
   effectivePostedDate,
   formatJobTiming,
   isLikelyEligible,
+  matchesEducationFilter,
   personalizedJobDetails,
   personalizedJobScore,
   resumeMatchDetails,
@@ -258,4 +259,21 @@ test("filters only explicit eligibility mismatches", () => {
   );
   assert.equal(isLikelyEligible(job, {}), false);
   assert.equal(isLikelyEligible({}, {}), true);
+});
+
+test("filters advanced-degree requirements without hiding unknown roles", () => {
+  assert.equal(matchesEducationFilter({ education_level: "phd" }, ""), true);
+  assert.equal(
+    matchesEducationFilter({ education_level: "phd" }, "exclude_phd"),
+    false,
+  );
+  assert.equal(
+    matchesEducationFilter({ education_level: "masters" }, "exclude_phd"),
+    true,
+  );
+  assert.equal(
+    matchesEducationFilter({ education_level: "masters" }, "undergraduate"),
+    false,
+  );
+  assert.equal(matchesEducationFilter({}, "undergraduate"), true);
 });

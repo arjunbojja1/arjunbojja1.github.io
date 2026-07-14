@@ -1,12 +1,13 @@
 import {
   formatJobTiming,
   isLikelyEligible,
+  matchesEducationFilter,
   personalizedJobDetails,
   resumeMatchDetails,
   resumeMatchScore,
   sortJobsRecommended,
   sourceLabel,
-} from "./job-utils.js?v=20260714-4";
+} from "./job-utils.js?v=20260714-5";
 import { readPdfPageText } from "./pdf-utils.js?v=20260713-4";
 
 const config = window.NEW_GRAD_ALERTS_CONFIG || {};
@@ -124,6 +125,7 @@ const elements = {
   jobRemoteFilter: document.querySelector("#job-remote-filter"),
   jobUnseenFilter: document.querySelector("#job-unseen-filter"),
   jobMinSalary: document.querySelector("#job-min-salary"),
+  jobEducationFilter: document.querySelector("#job-education-filter"),
   jobEligibleFilter: document.querySelector("#job-eligible-filter"),
   jobResultsStatus: document.querySelector("#job-results-status"),
   loadMoreJobs: document.querySelector("#load-more-jobs"),
@@ -847,6 +849,13 @@ function jobIntelligence(job) {
   if (job.graduation_years?.length) {
     details.push(`Graduation ${job.graduation_years.join("/")}`);
   }
+  if (job.education_level === "phd") {
+    details.push("PhD required");
+  } else if (job.education_level === "masters") {
+    details.push("Master's required");
+  } else if (job.education_level === "bachelors") {
+    details.push("Bachelor's required");
+  }
   if (job.degree_required) {
     details.push("Degree required");
   }
@@ -1043,6 +1052,7 @@ async function loadJobs({ append = false } = {}) {
   const exhaustive =
     elements.jobSort.value === "match" ||
     Number(elements.jobMinSalary.value || 0) > 0 ||
+    Boolean(elements.jobEducationFilter.value) ||
     elements.jobEligibleFilter.checked ||
     (
       elements.jobFeedMode.value === "for_you" &&
@@ -1052,7 +1062,35 @@ async function loadJobs({ append = false } = {}) {
     parameters.p_limit = 1000;
     parameters.p_offset = 0;
   }
-  const { data, error } = await client.rpc("get_job_feed", parameters);
+  let data = [];
+  let error = null;
+  if (exhaustive) {
+    let rawOffset = 0;
+    while (true) {
+      const response = await client.rpc("get_job_feed_v3", {
+        ...parameters,
+        p_offset: rawOffset,
+      });
+      if (response.error) {
+        error = response.error;
+        break;
+      }
+      if (loadVersion !== jobLoadVersion) {
+        return;
+      }
+      const batch = response.data || [];
+      data.push(...batch);
+      const total = Number(batch[0]?.total_count || 0);
+      if (batch.length < 1000 || data.length >= total) {
+        break;
+      }
+      rawOffset += batch.length;
+    }
+  } else {
+    const response = await client.rpc("get_job_feed_v3", parameters);
+    data = response.data || [];
+    error = response.error;
+  }
   if (loadVersion !== jobLoadVersion) {
     return;
   }
@@ -1076,6 +1114,9 @@ async function loadJobs({ append = false } = {}) {
       minimumSalary > 0 &&
       Number(job.salary_max || job.salary_min || 0) < minimumSalary
     ) {
+      return false;
+    }
+    if (!matchesEducationFilter(job, elements.jobEducationFilter.value)) {
       return false;
     }
     return (
@@ -2134,6 +2175,7 @@ for (const control of [
   elements.jobRemoteFilter,
   elements.jobUnseenFilter,
   elements.jobMinSalary,
+  elements.jobEducationFilter,
   elements.jobEligibleFilter,
 ]) {
   control.addEventListener("change", resetAndLoadJobs);

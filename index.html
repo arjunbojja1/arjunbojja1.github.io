@@ -27,7 +27,7 @@
       defer
     ></script>
     <script type="module" src="app.js?v=20260714-2"></script>
-    <script type="module" src="supabase-app.js?v=20260714-4"></script>
+    <script type="module" src="supabase-app.js?v=20260714-5"></script>
     <title>New Grad Job Alerts</title>
   </head>
   <body class="auth-required">
@@ -340,6 +340,14 @@
             <label class="field">
               <span>Minimum salary</span>
               <input id="job-min-salary" type="number" min="0" step="5000" placeholder="100000">
+            </label>
+            <label class="field">
+              <span>Education requirement</span>
+              <select id="job-education-filter">
+                <option value="">Any education level</option>
+                <option value="exclude_phd">Exclude PhD-required roles</option>
+                <option value="undergraduate">Bachelor's or no advanced degree</option>
+              </select>
             </label>
             <label class="field checkbox-field compact-check">
               <input id="job-eligible-filter" type="checkbox">
