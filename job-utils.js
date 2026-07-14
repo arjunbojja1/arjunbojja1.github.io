@@ -195,7 +195,12 @@ export function resumeMatchScore(job, resumeProfile) {
   return resumeMatchDetails(job, resumeProfile)?.score ?? null;
 }
 
-export function personalizedJobScore(job, preferences, resumeProfile) {
+export function personalizedJobScore(
+  job,
+  preferences,
+  resumeProfile,
+  referenceDate = new Date(),
+) {
   const haystack = [
     job.company,
     job.title,
@@ -230,13 +235,19 @@ export function personalizedJobScore(job, preferences, resumeProfile) {
   );
   const remoteScore =
     preferences?.remote_only && job.is_remote ? 5 : 0;
+  const ageDays = Math.max(
+    0,
+    (referenceDate - effectiveJobDate(job, referenceDate)) / 86_400_000,
+  );
+  const recencyScore = Math.max(0, 60 - ageDays * 2);
 
   return (
     (resumeMatchScore(job, resumeProfile) || 0) +
     locationScore +
     roleScore +
     keywordScore +
-    remoteScore
+    remoteScore +
+    recencyScore
   );
 }
 
@@ -286,8 +297,18 @@ export function sortJobsRecommended(
 ) {
   return [...jobs].sort(
     (left, right) =>
-      personalizedJobScore(right, preferences, resumeProfile) -
-        personalizedJobScore(left, preferences, resumeProfile) ||
+      personalizedJobScore(
+        right,
+        preferences,
+        resumeProfile,
+        referenceDate,
+      ) -
+        personalizedJobScore(
+          left,
+          preferences,
+          resumeProfile,
+          referenceDate,
+        ) ||
       effectiveJobDate(right, referenceDate) -
         effectiveJobDate(left, referenceDate),
   );

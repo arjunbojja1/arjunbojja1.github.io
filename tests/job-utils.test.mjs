@@ -159,3 +159,35 @@ test("ranks recommendations by location, preferences, resume, then recency", () 
     ["preferred", "second-location", "weak-specialization"],
   );
 });
+
+test("includes freshness directly in the recommendation score", () => {
+  const reference = new Date("2026-07-13T12:00:00Z");
+  const job = {
+    title: "Backend Python Engineer",
+    company: "Example",
+    location: "San Francisco, CA",
+    description: "Build distributed systems in Python.",
+    recommendation_terms: ["backend", "python"],
+    role_category: "software",
+  };
+  const preferences = {
+    locations: ["San Francisco"],
+    role_categories: ["software"],
+    include_keywords: ["backend"],
+  };
+
+  const freshScore = personalizedJobScore(
+    { ...job, posted_at: "2026-07-13" },
+    preferences,
+    SOFTWARE_RESUME,
+    reference,
+  );
+  const staleScore = personalizedJobScore(
+    { ...job, posted_at: "2026-06-01" },
+    preferences,
+    SOFTWARE_RESUME,
+    reference,
+  );
+
+  assert.ok(freshScore - staleScore > 55);
+});
