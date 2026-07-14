@@ -4,7 +4,7 @@ import {
   resumeMatchScore,
   sortJobsRecommended,
   sourceLabel,
-} from "./job-utils.js?v=20260714-1";
+} from "./job-utils.js?v=20260714-2";
 import { readPdfPageText } from "./pdf-utils.js?v=20260713-4";
 
 const config = window.NEW_GRAD_ALERTS_CONFIG || {};
