@@ -5,6 +5,7 @@ import {
   effectivePostedDate,
   formatJobTiming,
   isLikelyEligible,
+  isLikelyNewGradJob,
   matchesEducationFilter,
   personalizedJobDetails,
   personalizedJobScore,
@@ -195,23 +196,25 @@ test("includes freshness directly in the recommendation score", () => {
   assert.ok(freshScore - staleScore > 55);
 });
 
-test("prioritizes jobs from selected alert sources", () => {
-  const selected = {
-    id: "selected",
-    source: "new_grad",
-    title: "Software Engineer",
+test("prioritizes likely new-grad jobs across every source", () => {
+  const newGrad = {
+    id: "new-grad",
+    source: "ats",
+    title: "2026 University Graduate - Software Engineer",
     company: "Example",
     location: "Remote",
     role_category: "software",
     posted_at: "2026-07-10",
   };
-  const unselected = {
-    ...selected,
-    id: "unselected",
+  const experienced = {
+    ...newGrad,
+    id: "experienced",
     source: "ats",
     title: "Backend Python Engineer",
     description: "Build distributed systems in Python.",
     recommendation_terms: ["backend", "python"],
+    experience_min: 2,
+    experience_max: null,
     posted_at: "2026-07-13",
   };
   const preferences = {
@@ -221,19 +224,30 @@ test("prioritizes jobs from selected alert sources", () => {
 
   assert.deepEqual(
     sortJobsRecommended(
-      [unselected, selected],
+      [experienced, newGrad],
       preferences,
       SOFTWARE_RESUME,
       new Date("2026-07-14T12:00:00Z"),
     ).map((job) => job.id),
-    ["selected", "unselected"],
+    ["new-grad", "experienced"],
+  );
+  assert.equal(isLikelyNewGradJob(newGrad), true);
+  assert.equal(isLikelyNewGradJob(experienced), false);
+  assert.equal(
+    isLikelyNewGradJob({
+      source: "ats",
+      title: "Software Engineer",
+      experience_min: 0,
+      experience_max: 2,
+    }),
+    true,
   );
   assert.ok(
     personalizedJobDetails(
-      selected,
+      newGrad,
       preferences,
       SOFTWARE_RESUME,
-    ).reasons.includes("Selected alert source"),
+    ).reasons.includes("Likely new-grad role"),
   );
 });
 

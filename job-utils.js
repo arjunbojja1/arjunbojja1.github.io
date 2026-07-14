@@ -195,6 +195,47 @@ export function resumeMatchScore(job, resumeProfile) {
   return resumeMatchDetails(job, resumeProfile)?.score ?? null;
 }
 
+export function isLikelyNewGradJob(job) {
+  const title = String(job.title || "").toLowerCase();
+  if (
+    job.source === "internship" ||
+    job.source === "offseason_internship" ||
+    /\bintern(?:ship)?\b/.test(title)
+  ) {
+    return false;
+  }
+  if (job.source === "new_grad" || job.source === "canada_new_grad") {
+    return true;
+  }
+  if ((job.graduation_years || []).length > 0) {
+    return true;
+  }
+  if (
+    /\b(?:new (?:college )?grad(?:uate)?|university graduate|college graduate|recent graduate|graduate program|early career|entry[- ]level|junior|associate|engineer (?:i|1))\b/.test(
+      title,
+    )
+  ) {
+    return true;
+  }
+  const minimumKnown =
+    job.experience_min !== null &&
+    job.experience_min !== undefined &&
+    job.experience_min !== "";
+  const maximumKnown =
+    job.experience_max !== null &&
+    job.experience_max !== undefined &&
+    job.experience_max !== "";
+  const minimum = Number(job.experience_min);
+  const maximum = Number(job.experience_max);
+  return (
+    maximumKnown &&
+    Number.isFinite(maximum) &&
+    maximum >= 0 &&
+    maximum <= 2 &&
+    (!minimumKnown || (Number.isFinite(minimum) && minimum <= 2))
+  );
+}
+
 export function personalizedJobDetails(
   job,
   preferences,
@@ -223,8 +264,11 @@ export function personalizedJobDetails(
   )
     ? 15
     : 0;
-  const sourceMatch = (preferences?.source_keys || []).includes(job.source);
-  const sourceScore = sourceMatch ? 25 : 0;
+  const prioritizeNewGrad = (preferences?.source_keys || []).includes(
+    "new_grad",
+  );
+  const newGradMatch = prioritizeNewGrad && isLikelyNewGradJob(job);
+  const newGradScore = newGradMatch ? 25 : 0;
   const keywordScore = Math.min(
     15,
     (preferences?.include_keywords || []).filter((keyword) => {
@@ -291,7 +335,7 @@ export function personalizedJobDetails(
     resumeScore +
     locationScore +
     roleScore +
-    sourceScore +
+    newGradScore +
     keywordScore +
     remoteScore +
     recencyScore +
@@ -307,8 +351,8 @@ export function personalizedJobDetails(
         : `Location preference #${locationIndex + 1}`,
     );
   }
-  if (sourceMatch) {
-    reasons.push("Selected alert source");
+  if (newGradMatch) {
+    reasons.push("Likely new-grad role");
   }
   if (resumeDetails?.reasons.length) {
     reasons.push(...resumeDetails.reasons.slice(0, 2));
@@ -343,7 +387,7 @@ export function personalizedJobDetails(
       resume: resumeScore,
       location: locationScore,
       role: roleScore,
-      source: sourceScore,
+      newGrad: newGradScore,
       keywords: keywordScore,
       remote: remoteScore,
       recency: recencyScore,
@@ -449,12 +493,15 @@ export function sortJobsRecommended(
   resumeProfile,
   referenceDate = new Date(),
 ) {
-  const selectedSources = new Set(preferences?.source_keys || []);
-  const sourcePriority = (job) => selectedSources.has(job.source) ? 1 : 0;
+  const prioritizeNewGrad = (preferences?.source_keys || []).includes(
+    "new_grad",
+  );
+  const newGradPriority = (job) =>
+    prioritizeNewGrad && isLikelyNewGradJob(job) ? 1 : 0;
   return [...jobs].sort(
     (left, right) =>
-      sourcePriority(right) -
-        sourcePriority(left) ||
+      newGradPriority(right) -
+        newGradPriority(left) ||
       personalizedJobScore(
         right,
         preferences,
