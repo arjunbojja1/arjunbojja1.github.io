@@ -1,10 +1,12 @@
 import {
   formatJobTiming,
+  isLikelyEligible,
+  personalizedJobDetails,
   resumeMatchDetails,
   resumeMatchScore,
   sortJobsRecommended,
   sourceLabel,
-} from "./job-utils.js?v=20260714-3";
+} from "./job-utils.js?v=20260714-4";
 import { readPdfPageText } from "./pdf-utils.js?v=20260713-4";
 
 const config = window.NEW_GRAD_ALERTS_CONFIG || {};
@@ -39,6 +41,7 @@ const MIGRATABLE_PREFERENCE_FIELDS = [
   "closure_alerts",
   "minimum_score",
   "email_fallback",
+  "digest_max_jobs",
 ];
 const MIGRATABLE_PROFILE_FIELDS = [
   "timezone",
@@ -104,6 +107,7 @@ const elements = {
   deliveryMode: document.querySelector("#delivery-mode"),
   timezone: document.querySelector("#timezone-input"),
   digestHour: document.querySelector("#digest-hour"),
+  digestMaxJobs: document.querySelector("#digest-max-jobs"),
   quietStart: document.querySelector("#quiet-start"),
   quietEnd: document.querySelector("#quiet-end"),
   monitorForm: document.querySelector("#monitor-form"),
@@ -119,10 +123,13 @@ const elements = {
   jobSort: document.querySelector("#job-sort"),
   jobRemoteFilter: document.querySelector("#job-remote-filter"),
   jobUnseenFilter: document.querySelector("#job-unseen-filter"),
+  jobMinSalary: document.querySelector("#job-min-salary"),
+  jobEligibleFilter: document.querySelector("#job-eligible-filter"),
   jobResultsStatus: document.querySelector("#job-results-status"),
   loadMoreJobs: document.querySelector("#load-more-jobs"),
   jobList: document.querySelector("#job-list"),
   applicationSummary: document.querySelector("#application-summary"),
+  applicationAnalytics: document.querySelector("#application-analytics"),
   applicationList: document.querySelector("#application-list"),
   addApplicationButton: document.querySelector("#add-application-button"),
   exportApplicationsButton: document.querySelector("#export-applications-button"),
@@ -148,6 +155,7 @@ const elements = {
   testAlertStatus: document.querySelector("#test-alert-status"),
   setupHealthList: document.querySelector("#setup-health-list"),
   systemHealthGrid: document.querySelector("#system-health-grid"),
+  deliveryHealthGrid: document.querySelector("#delivery-health-grid"),
   refreshStatusButton: document.querySelector("#refresh-status-button"),
   resumeFile: document.querySelector("#resume-file"),
   resumeStatus: document.querySelector("#resume-status"),
@@ -400,6 +408,9 @@ function populateAdvancedPreferences(preferences, profile) {
   elements.minimumScoreOutput.value = `${preferences.minimum_score || 0}%`;
   elements.closureAlerts.checked = preferences.closure_alerts !== false;
   elements.emailFallback.checked = preferences.email_fallback === true;
+  elements.digestMaxJobs.value = String(
+    Math.min(50, Math.max(1, Number(preferences.digest_max_jobs) || 10)),
+  );
   for (const input of elements.roleCategories) {
     input.checked = (preferences.role_categories || []).includes(input.value);
   }
@@ -431,6 +442,10 @@ function collectAdvancedPreferences() {
     closure_alerts: elements.closureAlerts.checked,
     email_fallback: elements.emailFallback.checked,
     minimum_score: Number(elements.minimumScore.value),
+    digest_max_jobs: Math.min(
+      50,
+      Math.max(1, Number(elements.digestMaxJobs.value) || 10),
+    ),
   };
 }
 
@@ -791,6 +806,53 @@ async function markJobState(jobId, values) {
   }
 }
 
+function formatSalary(job) {
+  if (!job.salary_min && !job.salary_max) {
+    return null;
+  }
+  const formatter = new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: job.salary_currency || "USD",
+    maximumFractionDigits: 0,
+  });
+  if (job.salary_min && job.salary_max) {
+    return `${formatter.format(job.salary_min)}–${formatter.format(job.salary_max)}`;
+  }
+  return formatter.format(job.salary_min || job.salary_max);
+}
+
+function jobIntelligence(job) {
+  const details = [];
+  if (job.verification_status === "verified") {
+    details.push(
+      `Verified active${
+        job.verified_at ? ` ${formatRelativeTime(job.verified_at)}` : ""
+      }`,
+    );
+  }
+  const salary = formatSalary(job);
+  if (salary) {
+    details.push(salary);
+  }
+  if (job.application_deadline) {
+    details.push(`Deadline ${job.application_deadline}`);
+  }
+  if (job.experience_min !== null && job.experience_min !== undefined) {
+    details.push(
+      job.experience_max !== null && job.experience_max !== undefined
+        ? `${job.experience_min}–${job.experience_max} years experience`
+        : `${job.experience_min}+ years experience`,
+    );
+  }
+  if (job.graduation_years?.length) {
+    details.push(`Graduation ${job.graduation_years.join("/")}`);
+  }
+  if (job.degree_required) {
+    details.push("Degree required");
+  }
+  return details;
+}
+
 function createJobCard(job) {
   const card = document.createElement("article");
   card.className = "job-card";
@@ -814,20 +876,34 @@ function createJobCard(job) {
     job,
     currentProfile?.resume_profile,
   );
+  const recommendation = personalizedJobDetails(
+    job,
+    currentPreferences,
+    currentProfile?.resume_profile,
+  );
   const matchScore = matchDetails?.score ?? null;
   score.textContent =
     matchScore === null ? "Upload resume" : `${matchScore}% match`;
   content.append(title, company, meta, timing);
+  const intelligence = jobIntelligence(job);
+  if (intelligence.length) {
+    const intelligenceMeta = document.createElement("div");
+    intelligenceMeta.className = "job-meta job-intelligence";
+    intelligenceMeta.textContent = intelligence.join(" · ");
+    content.append(intelligenceMeta);
+  }
   if (job.application_status) {
     const applicationBadge = document.createElement("div");
     applicationBadge.className = "job-meta application-badge";
     applicationBadge.textContent = `Application: ${job.application_status}`;
     content.append(applicationBadge);
   }
-  if (matchDetails?.reasons.length) {
+  if (recommendation.reasons.length) {
     const reasons = document.createElement("p");
     reasons.className = "job-match-reasons";
-    reasons.textContent = matchDetails.reasons.join(" · ");
+    reasons.textContent = `Recommended because: ${recommendation.reasons
+      .slice(0, 5)
+      .join(" · ")}`;
     content.append(reasons);
   }
 
@@ -840,7 +916,10 @@ function createJobCard(job) {
   apply.rel = "noopener";
   apply.textContent = "Apply";
   apply.addEventListener("click", () => {
-    markJobState(job.id, { viewed_at: new Date().toISOString() })
+    markJobState(job.id, {
+      viewed_at: new Date().toISOString(),
+      feedback: "interested",
+    })
       .then(() => {
         job.viewed_at = new Date().toISOString();
         card.classList.remove("unseen");
@@ -853,17 +932,29 @@ function createJobCard(job) {
   save.textContent = job.application_status ? "Edit application" : "Save";
   save.addEventListener("click", async () => {
     if (job.application_status) {
-      if (!applications.some((application) => application.job_id === job.id)) {
+      if (
+        !applications.some(
+          (application) =>
+            application.id === job.application_id ||
+            application.job_id === job.id,
+        )
+      ) {
         await loadApplications();
       }
       openApplicationDialog(
-        applications.find((application) => application.job_id === job.id) || {
+        applications.find(
+          (application) =>
+            application.id === job.application_id ||
+            application.job_id === job.id,
+        ) || {
+          id: job.application_id,
           job_id: job.id,
           company: job.company,
           title: job.title,
           location: job.location,
           url: job.url,
           status: job.application_status,
+          deadline_at: job.application_deadline,
         },
       );
       return;
@@ -873,12 +964,16 @@ function createJobCard(job) {
   const hide = document.createElement("button");
   hide.className = "text-button";
   hide.type = "button";
-  hide.textContent = job.hidden_at ? "Unhide" : "Hide";
+  hide.textContent = job.hidden_at ? "Restore" : "Not interested";
   hide.addEventListener("click", async () => {
     try {
-      await markJobState(job.id, {
-        hidden_at: job.hidden_at ? null : new Date().toISOString(),
+      const { error } = await client.rpc("set_job_group_hidden", {
+        p_job_id: job.id,
+        p_hidden: !job.hidden_at,
       });
+      if (error) {
+        throw error;
+      }
       jobs = jobs.filter((item) => item.id !== job.id);
       jobTotal = Math.max(0, jobTotal - 1);
       renderJobs();
@@ -947,6 +1042,8 @@ async function loadJobs({ append = false } = {}) {
   const parameters = jobFeedParameters();
   const exhaustive =
     elements.jobSort.value === "match" ||
+    Number(elements.jobMinSalary.value || 0) > 0 ||
+    elements.jobEligibleFilter.checked ||
     (
       elements.jobFeedMode.value === "for_you" &&
       Number(currentPreferences?.minimum_score || 0) > 0
@@ -970,9 +1067,22 @@ async function loadJobs({ append = false } = {}) {
     elements.jobFeedMode.value === "for_you"
       ? Number(currentPreferences?.minimum_score || 0)
       : 0;
-  let pageJobs = rawJobs.filter(
-    (job) => minimumScore === 0 || (jobScore(job) || 0) >= minimumScore,
-  );
+  const minimumSalary = Number(elements.jobMinSalary.value || 0);
+  let pageJobs = rawJobs.filter((job) => {
+    if (minimumScore > 0 && (jobScore(job) || 0) < minimumScore) {
+      return false;
+    }
+    if (
+      minimumSalary > 0 &&
+      Number(job.salary_max || job.salary_min || 0) < minimumSalary
+    ) {
+      return false;
+    }
+    return (
+      !elements.jobEligibleFilter.checked ||
+      isLikelyEligible(job, currentProfile?.resume_profile)
+    );
+  });
   if (elements.jobSort.value === "match") {
     pageJobs = sortJobsRecommended(
       pageJobs,
@@ -1023,6 +1133,8 @@ async function saveJobApplication(job) {
       location: job.location,
       url: job.url,
       status: "saved",
+      resume_version: currentProfile?.resume_profile?.extracted_at || null,
+      deadline_at: job.application_deadline || null,
     },
     { onConflict: "user_id,job_id", ignoreDuplicates: true },
   );
@@ -1033,7 +1145,10 @@ async function saveJobApplication(job) {
   }
   job.application_status = "saved";
   job.viewed_at = new Date().toISOString();
-  await markJobState(job.id, { viewed_at: job.viewed_at });
+  await markJobState(job.id, {
+    viewed_at: job.viewed_at,
+    feedback: "interested",
+  });
   await loadApplications();
   renderJobs();
 }
@@ -1054,6 +1169,49 @@ function renderApplicationSummary() {
       card.append(count, label);
       return card;
     }),
+  );
+  renderApplicationAnalytics();
+}
+
+function mostCommon(values) {
+  const counts = new Map();
+  for (const value of values.filter(Boolean)) {
+    counts.set(value, (counts.get(value) || 0) + 1);
+  }
+  return [...counts.entries()].sort(
+    (left, right) => right[1] - left[1] || left[0].localeCompare(right[0]),
+  )[0]?.[0];
+}
+
+function renderApplicationAnalytics() {
+  const submitted = applications.filter(
+    (application) => application.status !== "saved",
+  );
+  const responses = submitted.filter((application) =>
+    ["interview", "offer", "rejected"].includes(application.status),
+  );
+  const offers = submitted.filter(
+    (application) => application.status === "offer",
+  );
+  const responseRate = submitted.length
+    ? Math.round((responses.length / submitted.length) * 100)
+    : 0;
+  const offerRate = submitted.length
+    ? Math.round((offers.length / submitted.length) * 100)
+    : 0;
+  const topCompany = mostCommon(applications.map((item) => item.company));
+  const topRole = mostCommon(applications.map((item) => item.title));
+  const topLocation = mostCommon(applications.map((item) => item.location));
+  const resumeVersions = new Set(
+    applications.map((item) => item.resume_version).filter(Boolean),
+  ).size;
+  elements.applicationAnalytics.replaceChildren(
+    createHealthItem("Response rate", `${responseRate}%`),
+    createHealthItem("Offer rate", `${offerRate}%`),
+    createHealthItem("Top company", topCompany || "No data"),
+    createHealthItem("Top role", topRole || "No data"),
+    createHealthItem("Top location", topLocation || "No data"),
+    createHealthItem("Resume versions tested", String(resumeVersions)),
   );
 }
 
@@ -1220,7 +1378,10 @@ async function saveApplication(event) {
   let query = client.from("applications");
   query = elements.applicationId.value
     ? query.update(record).eq("id", elements.applicationId.value)
-    : query.insert(record);
+    : query.insert({
+        ...record,
+        resume_version: currentProfile?.resume_profile?.extracted_at || null,
+      });
   const { error } = await query;
   if (error) {
     console.error(error);
@@ -1256,6 +1417,7 @@ async function exportApplications() {
     "url",
     "notes",
     "archived",
+    "resume_version",
   ];
   const csv = [
     columns.map(csvCell).join(","),
@@ -1292,11 +1454,33 @@ function createInboxItem(item) {
     timestamp ? new Date(timestamp).toLocaleString() : null,
   ].filter(Boolean).join(" · ");
   card.append(title, meta);
-  if (item.last_error && item.status === "failed") {
+  if (
+    item.last_error &&
+    ["failed", "skipped"].includes(item.status)
+  ) {
     const error = document.createElement("p");
     error.className = "job-match-reasons";
     error.textContent = item.last_error;
     card.append(error);
+  }
+  if (["failed", "skipped"].includes(item.status)) {
+    const retry = document.createElement("button");
+    retry.className = "text-button";
+    retry.type = "button";
+    retry.textContent = "Retry delivery";
+    retry.addEventListener("click", async () => {
+      retry.disabled = true;
+      const { error } = await client.rpc("retry_notification", {
+        p_queue_id: item.id,
+      });
+      if (error) {
+        retry.disabled = false;
+        retry.textContent = error.message;
+        return;
+      }
+      await Promise.all([loadInbox(), loadNotificationHealth()]);
+    });
+    card.append(retry);
   }
   if (item.job?.url) {
     const open = document.createElement("a");
@@ -1468,6 +1652,48 @@ async function loadSystemHealth() {
     ),
   );
   renderSetupHealth();
+  await loadNotificationHealth();
+}
+
+async function loadNotificationHealth() {
+  if (!client || !isSignedIn()) {
+    return;
+  }
+  const { data, error } = await client.rpc("get_notification_health");
+  if (error) {
+    elements.deliveryHealthGrid.replaceChildren(
+      createHealthItem("Delivery diagnostics", "Unavailable", "error"),
+    );
+    return;
+  }
+  const pushActive = Boolean(window.JobAlertsUI?.isPushActive());
+  elements.deliveryHealthGrid.replaceChildren(
+    createHealthItem(
+      "This device",
+      pushActive ? "Linked" : "Not linked",
+      pushActive ? "ready" : "error",
+    ),
+    createHealthItem(
+      "Last successful delivery",
+      formatRelativeTime(data.last_successful_delivery_at),
+      data.last_successful_delivery_at ? "ready" : "warning",
+    ),
+    createHealthItem(
+      "Successful deliveries",
+      String(data.successful_deliveries || 0),
+    ),
+    createHealthItem("Pending", String(data.pending || 0)),
+    createHealthItem(
+      "Failed",
+      String(data.failed || 0),
+      data.failed ? "error" : "ready",
+    ),
+    createHealthItem(
+      "Last error",
+      data.last_error || "None",
+      data.last_error ? "warning" : "ready",
+    ),
+  );
 }
 
 function detectMonitor(url) {
@@ -1582,7 +1808,34 @@ function deriveResumeProfile(text) {
       .match(/[a-z][a-z+#.]{2,}/g)
       ?.filter((word) => word.length < 30) || [],
   )].slice(0, 150);
-  return { skills, keywords, extracted_at: new Date().toISOString() };
+  const graduationYears = [
+    ...text.matchAll(
+      /(?:graduat(?:e|ing|ion)|expected|class of|degree)[^0-9]{0,30}(20(?:2[4-9]|3[0-5]))/gi,
+    ),
+  ].map((match) => Number(match[1]));
+  const degreeTerms = [
+    ...new Set(
+      text
+        .toLowerCase()
+        .match(
+          /\b(bachelor(?:'s)?|master(?:'s)?|b\.?s\.?|m\.?s\.?|ph\.?d\.?)\b/g,
+        ) || [],
+    ),
+  ];
+  const experienceYears = Math.max(
+    0,
+    ...[...text.matchAll(/\b(\d{1,2})\+?\s+years? of experience\b/gi)]
+      .map((match) => Number(match[1]))
+      .filter((value) => value <= 20),
+  );
+  return {
+    skills,
+    keywords,
+    graduation_years: [...new Set(graduationYears)].sort(),
+    degree_terms: degreeTerms,
+    experience_years: experienceYears,
+    extracted_at: new Date().toISOString(),
+  };
 }
 
 function renderResumeProfile(profile) {
@@ -1880,6 +2133,8 @@ for (const control of [
   elements.jobSort,
   elements.jobRemoteFilter,
   elements.jobUnseenFilter,
+  elements.jobMinSalary,
+  elements.jobEligibleFilter,
 ]) {
   control.addEventListener("change", resetAndLoadJobs);
 }

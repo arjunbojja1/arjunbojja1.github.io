@@ -4,6 +4,8 @@ import assert from "node:assert/strict";
 import {
   effectivePostedDate,
   formatJobTiming,
+  isLikelyEligible,
+  personalizedJobDetails,
   personalizedJobScore,
   resumeMatchDetails,
   resumeMatchScore,
@@ -190,4 +192,70 @@ test("includes freshness directly in the recommendation score", () => {
   );
 
   assert.ok(freshScore - staleScore > 55);
+});
+
+test("explains eligibility, urgency, verification, and feedback signals", () => {
+  const details = personalizedJobDetails(
+    {
+      title: "Backend Python Engineer",
+      company: "Example",
+      location: "San Francisco, CA",
+      description: "Build Python services.",
+      recommendation_terms: ["backend", "python"],
+      role_category: "software",
+      posted_at: "2026-07-13",
+      application_deadline: "2026-07-20",
+      graduation_years: [2027],
+      degree_required: true,
+      experience_min: 1,
+      verification_status: "verified",
+      feedback_adjustment: -5,
+    },
+    {
+      locations: ["San Francisco"],
+      role_categories: ["software"],
+      include_keywords: ["backend"],
+    },
+    {
+      ...SOFTWARE_RESUME,
+      graduation_years: [2027],
+      degree_terms: ["bachelor"],
+      experience_years: 2,
+    },
+    new Date("2026-07-13T12:00:00Z"),
+  );
+
+  assert.ok(details.components.eligibility > 0);
+  assert.equal(details.components.urgency, 15);
+  assert.equal(details.components.verification, 5);
+  assert.equal(details.components.feedback, -5);
+  assert.ok(details.reasons.includes("Graduation year matches"));
+  assert.ok(details.reasons.includes("Application link verified"));
+});
+
+test("filters only explicit eligibility mismatches", () => {
+  const job = {
+    graduation_years: [2027],
+    degree_required: true,
+    experience_min: 1,
+  };
+
+  assert.equal(
+    isLikelyEligible(job, {
+      graduation_years: [2027],
+      degree_terms: ["bachelor"],
+      experience_years: 2,
+    }),
+    true,
+  );
+  assert.equal(
+    isLikelyEligible(job, {
+      graduation_years: [2026],
+      degree_terms: ["bachelor"],
+      experience_years: 2,
+    }),
+    false,
+  );
+  assert.equal(isLikelyEligible(job, {}), false);
+  assert.equal(isLikelyEligible({}, {}), true);
 });

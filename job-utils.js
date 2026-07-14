@@ -195,7 +195,7 @@ export function resumeMatchScore(job, resumeProfile) {
   return resumeMatchDetails(job, resumeProfile)?.score ?? null;
 }
 
-export function personalizedJobScore(
+export function personalizedJobDetails(
   job,
   preferences,
   resumeProfile,
@@ -240,14 +240,150 @@ export function personalizedJobScore(
     (referenceDate - effectiveJobDate(job, referenceDate)) / 86_400_000,
   );
   const recencyScore = Math.max(0, 60 - ageDays * 2);
-
-  return (
-    (resumeMatchScore(job, resumeProfile) || 0) +
+  const resumeDetails = resumeMatchDetails(job, resumeProfile);
+  const resumeScore = resumeDetails?.score || 0;
+  const resumeGraduationYears = resumeProfile?.graduation_years || [];
+  const graduationYears = job.graduation_years || [];
+  const graduationMatch =
+    graduationYears.length > 0 &&
+    resumeGraduationYears.some((year) => graduationYears.includes(year));
+  const graduationMismatch =
+    graduationYears.length > 0 &&
+    resumeGraduationYears.length > 0 &&
+    !graduationMatch;
+  const degreeMatch =
+    !job.degree_required || (resumeProfile?.degree_terms || []).length > 0;
+  const resumeExperience = Number(resumeProfile?.experience_years || 0);
+  const experienceMatch =
+    job.experience_min !== null &&
+    job.experience_min !== undefined &&
+    resumeExperience > 0 &&
+    resumeExperience >= Number(job.experience_min);
+  const experienceMismatch =
+    job.experience_min !== null &&
+    job.experience_min !== undefined &&
+    resumeExperience > 0 &&
+    resumeExperience < Number(job.experience_min);
+  const eligibilityScore =
+    (graduationMatch ? 10 : graduationMismatch ? -20 : 0) +
+    (job.degree_required ? (degreeMatch ? 5 : -10) : 0) +
+    (experienceMatch ? 5 : experienceMismatch ? -10 : 0);
+  const deadline = job.application_deadline
+    ? new Date(`${job.application_deadline}T23:59:59`)
+    : null;
+  const deadlineDays = deadline
+    ? (deadline - referenceDate) / 86_400_000
+    : null;
+  const urgencyScore =
+    deadlineDays !== null && deadlineDays >= 0
+      ? deadlineDays <= 14
+        ? 15
+        : deadlineDays <= 30
+          ? 8
+          : 0
+      : 0;
+  const verificationScore =
+    job.verification_status === "verified" ? 5 : 0;
+  const feedbackScore = Number(job.feedback_adjustment || 0);
+  const score =
+    resumeScore +
     locationScore +
     roleScore +
     keywordScore +
     remoteScore +
-    recencyScore
+    recencyScore +
+    eligibilityScore +
+    urgencyScore +
+    verificationScore +
+    feedbackScore;
+  const reasons = [];
+  if (locationScore) {
+    reasons.push(
+      locationIndex === 0
+        ? "Top location preference"
+        : `Location preference #${locationIndex + 1}`,
+    );
+  }
+  if (resumeDetails?.reasons.length) {
+    reasons.push(...resumeDetails.reasons.slice(0, 2));
+  }
+  if (recencyScore >= 45) {
+    reasons.push("Recently posted");
+  } else if (recencyScore > 0) {
+    reasons.push("Recency considered");
+  }
+  if (graduationMatch) {
+    reasons.push("Graduation year matches");
+  }
+  if (degreeMatch && job.degree_required) {
+    reasons.push("Degree requirement matches");
+  }
+  if (experienceMatch) {
+    reasons.push("Experience requirement matches");
+  }
+  if (urgencyScore) {
+    reasons.push("Application deadline approaching");
+  }
+  if (verificationScore) {
+    reasons.push("Application link verified");
+  }
+  if (feedbackScore < 0) {
+    reasons.push("Adjusted using your feedback");
+  }
+  return {
+    score,
+    reasons,
+    components: {
+      resume: resumeScore,
+      location: locationScore,
+      role: roleScore,
+      keywords: keywordScore,
+      remote: remoteScore,
+      recency: recencyScore,
+      eligibility: eligibilityScore,
+      urgency: urgencyScore,
+      verification: verificationScore,
+      feedback: feedbackScore,
+    },
+  };
+}
+
+export function personalizedJobScore(
+  job,
+  preferences,
+  resumeProfile,
+  referenceDate = new Date(),
+) {
+  return personalizedJobDetails(
+    job,
+    preferences,
+    resumeProfile,
+    referenceDate,
+  ).score;
+}
+
+export function isLikelyEligible(job, resumeProfile) {
+  const resumeGraduationYears = resumeProfile?.graduation_years || [];
+  const graduationYears = job.graduation_years || [];
+  if (
+    graduationYears.length > 0 &&
+    resumeGraduationYears.length > 0 &&
+    !resumeGraduationYears.some((year) => graduationYears.includes(year))
+  ) {
+    return false;
+  }
+  if (
+    job.degree_required &&
+    !(resumeProfile?.degree_terms || []).length
+  ) {
+    return false;
+  }
+  const resumeExperience = Number(resumeProfile?.experience_years || 0);
+  return !(
+    job.experience_min !== null &&
+    job.experience_min !== undefined &&
+    resumeExperience > 0 &&
+    resumeExperience < Number(job.experience_min)
   );
 }
 

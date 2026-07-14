@@ -12,7 +12,7 @@
     <link rel="manifest" href="manifest.webmanifest">
     <link rel="icon" href="icons/icon-192.png">
     <link rel="apple-touch-icon" href="icons/icon-192.png">
-    <link rel="stylesheet" href="styles.css?v=20260713-4">
+    <link rel="stylesheet" href="styles.css?v=20260714-4">
     <script src="config.js?v=20260713-4"></script>
     <script>
       window.OneSignalDeferred = window.OneSignalDeferred || [];
@@ -27,7 +27,7 @@
       defer
     ></script>
     <script type="module" src="app.js?v=20260714-2"></script>
-    <script type="module" src="supabase-app.js?v=20260714-3"></script>
+    <script type="module" src="supabase-app.js?v=20260714-4"></script>
     <title>New Grad Job Alerts</title>
   </head>
   <body class="auth-required">
@@ -236,6 +236,10 @@
               <select id="digest-hour"></select>
             </label>
             <label class="field">
+              <span>Maximum jobs per digest</span>
+              <input id="digest-max-jobs" type="number" min="1" max="50" value="10">
+            </label>
+            <label class="field">
               <span>Quiet hours start</span>
               <input id="quiet-start" type="time">
             </label>
@@ -333,6 +337,14 @@
               <input id="job-unseen-filter" type="checkbox">
               <span>Unseen only</span>
             </label>
+            <label class="field">
+              <span>Minimum salary</span>
+              <input id="job-min-salary" type="number" min="0" step="5000" placeholder="100000">
+            </label>
+            <label class="field checkbox-field compact-check">
+              <input id="job-eligible-filter" type="checkbox">
+              <span>Likely eligible only</span>
+            </label>
           </div>
           <p id="job-results-status" class="muted" aria-live="polite"></p>
           <div id="job-list" class="job-list"><p class="muted">Loading jobs...</p></div>
@@ -351,6 +363,7 @@
           </div>
         </header>
         <div id="application-summary" class="summary-grid"></div>
+        <div id="application-analytics" class="health-grid"></div>
         <div class="card">
           <label class="field checkbox-field compact-check">
             <input id="show-archived-applications" type="checkbox">
@@ -400,6 +413,12 @@
         </header>
         <div id="system-health-grid" class="health-grid">
           <p class="muted">Loading service health...</p>
+        </div>
+        <div class="card">
+          <h2>Notification delivery</h2>
+          <div id="delivery-health-grid" class="health-grid">
+            <p class="muted">Loading delivery health...</p>
+          </div>
         </div>
         <div class="card">
           <h2>What this means</h2>

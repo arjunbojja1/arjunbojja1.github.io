@@ -95,6 +95,13 @@ test("requires an account and defaults to dark mode", async ({ page }) => {
         document.querySelector("#export-data-button") &&
           document.querySelector("#delete-account-button"),
       ),
+      hasIntelligenceFeatures: Boolean(
+        document.querySelector("#digest-max-jobs") &&
+          document.querySelector("#application-analytics") &&
+          document.querySelector("#delivery-health-grid") &&
+          document.querySelector("#job-min-salary") &&
+          document.querySelector("#job-eligible-filter"),
+      ),
     };
   });
 
@@ -110,6 +117,7 @@ test("requires an account and defaults to dark mode", async ({ page }) => {
     defaultJobSort: "match",
     navViews: ["alerts", "jobs", "applications", "inbox", "resume", "status"],
     hasPrivacyControls: true,
+    hasIntelligenceFeatures: true,
   });
   expect(state.timezoneOptions).toBeGreaterThan(10);
   const selectionCount = await page.evaluate(() => {
