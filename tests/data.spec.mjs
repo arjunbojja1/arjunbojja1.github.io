@@ -87,6 +87,7 @@ test("requires an account and defaults to dark mode", async ({ page }) => {
       feedModes: [...document.querySelector("#job-feed-mode").options].map(
         (option) => option.value,
       ),
+      defaultJobSort: document.querySelector("#job-sort").value,
       navViews: [...document.querySelectorAll("[data-view]")].map(
         (button) => button.dataset.view,
       ),
@@ -106,6 +107,7 @@ test("requires an account and defaults to dark mode", async ({ page }) => {
     timezoneOptions: state.timezoneOptions,
     timezoneTag: "SELECT",
     feedModes: ["for_you", "all", "hidden"],
+    defaultJobSort: "match",
     navViews: ["alerts", "jobs", "applications", "inbox", "resume", "status"],
     hasPrivacyControls: true,
   });

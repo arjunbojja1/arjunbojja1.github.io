@@ -195,6 +195,51 @@ export function resumeMatchScore(job, resumeProfile) {
   return resumeMatchDetails(job, resumeProfile)?.score ?? null;
 }
 
+export function personalizedJobScore(job, preferences, resumeProfile) {
+  const haystack = [
+    job.company,
+    job.title,
+    job.location,
+    job.description,
+    ...(job.recommendation_terms || []),
+  ]
+    .join(" ")
+    .toLowerCase();
+  const haystackTerms = new Set(terms(haystack));
+  const locations = preferences?.locations || [];
+  const location = String(job.location || "").toLowerCase();
+  const locationIndex = locations.findIndex((value) =>
+    location.includes(String(value).toLowerCase()),
+  );
+  const locationScore =
+    locationIndex < 0 ? 0 : 40 / (locationIndex + 1);
+  const roleScore = (preferences?.role_categories || []).includes(
+    job.role_category,
+  )
+    ? 15
+    : 0;
+  const keywordScore = Math.min(
+    15,
+    (preferences?.include_keywords || []).filter((keyword) => {
+      const keywordTerms = terms(keyword);
+      return (
+        keywordTerms.length > 0 &&
+        keywordTerms.every((term) => haystackTerms.has(term))
+      );
+    }).length * 5,
+  );
+  const remoteScore =
+    preferences?.remote_only && job.is_remote ? 5 : 0;
+
+  return (
+    (resumeMatchScore(job, resumeProfile) || 0) +
+    locationScore +
+    roleScore +
+    keywordScore +
+    remoteScore
+  );
+}
+
 export function effectivePostedDate(job, referenceDate = new Date()) {
   if (!job.posted_at) {
     return null;
@@ -230,6 +275,21 @@ export function sortJobsNewestFirst(jobs, referenceDate = new Date()) {
     (left, right) =>
       effectiveJobDate(right, referenceDate) -
       effectiveJobDate(left, referenceDate),
+  );
+}
+
+export function sortJobsRecommended(
+  jobs,
+  preferences,
+  resumeProfile,
+  referenceDate = new Date(),
+) {
+  return [...jobs].sort(
+    (left, right) =>
+      personalizedJobScore(right, preferences, resumeProfile) -
+        personalizedJobScore(left, preferences, resumeProfile) ||
+      effectiveJobDate(right, referenceDate) -
+        effectiveJobDate(left, referenceDate),
   );
 }
 

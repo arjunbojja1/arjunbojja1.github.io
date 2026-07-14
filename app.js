@@ -37,6 +37,10 @@ elements.recommendedButton.textContent =
 let companies = [];
 let deferredInstallPrompt = null;
 let oneSignal = null;
+let resolvePushReady;
+const pushReady = new Promise((resolve) => {
+  resolvePushReady = resolve;
+});
 let selected = readStoredSet(STORAGE_KEY);
 let selectedTracks = new Set(
   [...readStoredSet(TRACK_STORAGE_KEY)].filter((track) => TRACK_TAGS[track]),
@@ -314,6 +318,7 @@ function initializeInstallExperience() {
 
 function initializeOneSignal() {
   const renderUnavailable = () => {
+    resolvePushReady(null);
     elements.enableButton.disabled = true;
     setStatus(
       elements.notificationStatus,
@@ -323,6 +328,7 @@ function initializeOneSignal() {
   };
   const appId = window.NEW_GRAD_ALERTS_CONFIG?.oneSignalAppId;
   if (!appId) {
+    resolvePushReady(null);
     elements.enableButton.disabled = true;
     setStatus(
       elements.notificationStatus,
@@ -353,6 +359,7 @@ function initializeOneSignal() {
         renderUnavailable,
       );
       oneSignal = sdk;
+      resolvePushReady(sdk);
 
       if (!sdk.Notifications.isPushSupported()) {
         elements.enableButton.disabled = true;
@@ -375,6 +382,7 @@ function initializeOneSignal() {
         await syncPreferences();
       }
     } catch (error) {
+      resolvePushReady(null);
       console.error(error);
       elements.enableButton.disabled = true;
       setStatus(
@@ -435,6 +443,7 @@ window.JobAlertsUI = {
     };
   },
   isPushActive,
+  pushReady,
 };
 window.dispatchEvent(new Event("job-alerts-ui-ready"));
 

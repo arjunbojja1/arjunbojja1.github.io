@@ -2,8 +2,9 @@ import {
   formatJobTiming,
   resumeMatchDetails,
   resumeMatchScore,
+  sortJobsRecommended,
   sourceLabel,
-} from "./job-utils.js?v=20260713-4";
+} from "./job-utils.js?v=20260714-1";
 import { readPdfPageText } from "./pdf-utils.js?v=20260713-4";
 
 const config = window.NEW_GRAD_ALERTS_CONFIG || {};
@@ -488,34 +489,53 @@ async function savePreferences(basicPreferences) {
 window.JobAlertsData = {
   savePreferences,
   isAuthenticated: isSignedIn,
+  ensurePushIdentity: () => syncOneSignalIdentity({ required: true }),
 };
 
-function syncOneSignalIdentity() {
-  window.OneSignalDeferred = window.OneSignalDeferred || [];
-  window.OneSignalDeferred.push(async (sdk) => {
-    const userId = isSignedIn() ? currentUser.id : null;
-    try {
-      if (userId) {
-        await sdk.login(userId);
-        if (currentUser?.id === userId) {
-          localStorage.setItem(ONESIGNAL_IDENTITY_KEY, userId);
-        }
-      } else {
-        await sdk.logout();
-        if (!isSignedIn()) {
-          localStorage.removeItem(ONESIGNAL_IDENTITY_KEY);
-        }
-      }
-    } catch (error) {
-      if (currentUser?.id === userId) {
-        setText(
-          elements.accountStatus,
-          "Signed in, but push notification identity is still connecting.",
-          true,
-        );
-      }
+async function syncOneSignalIdentity({ required = false } = {}) {
+  const ui = await jobAlertsUI();
+  const sdk = await ui.pushReady;
+  if (!sdk) {
+    if (required) {
+      throw new Error("Push notifications are not available in this browser.");
     }
-  });
+    return false;
+  }
+
+  const userId = isSignedIn() ? currentUser.id : null;
+  try {
+    if (userId) {
+      await sdk.login(userId);
+      if (currentUser?.id === userId) {
+        localStorage.setItem(ONESIGNAL_IDENTITY_KEY, userId);
+        return true;
+      }
+      if (required) {
+        throw new Error("The signed-in account changed while linking push.");
+      }
+      return false;
+    }
+    await sdk.logout();
+    if (!isSignedIn()) {
+      localStorage.removeItem(ONESIGNAL_IDENTITY_KEY);
+    }
+    return true;
+  } catch (error) {
+    if (currentUser?.id === userId) {
+      setText(
+        elements.accountStatus,
+        "Signed in, but push notification identity is still connecting.",
+        true,
+      );
+    }
+    if (required) {
+      throw new Error(
+        "Push notification identity could not be linked. Reload and try again.",
+        { cause: error },
+      );
+    }
+    return false;
+  }
 }
 
 function renderAccount() {
@@ -954,10 +974,10 @@ async function loadJobs({ append = false } = {}) {
     (job) => minimumScore === 0 || (jobScore(job) || 0) >= minimumScore,
   );
   if (elements.jobSort.value === "match") {
-    pageJobs = [...pageJobs].sort(
-      (left, right) =>
-        (jobScore(right) ?? -1) - (jobScore(left) ?? -1) ||
-        new Date(right.first_seen_at) - new Date(left.first_seen_at),
+    pageJobs = sortJobsRecommended(
+      pageJobs,
+      currentPreferences,
+      currentProfile?.resume_profile,
     );
   }
   jobTotal = exhaustive
@@ -1355,6 +1375,25 @@ async function markInboxRead() {
 async function requestTestAlert() {
   elements.testAlertButton.disabled = true;
   elements.inboxTestAlertButton.disabled = true;
+  if (!window.JobAlertsUI?.isPushActive()) {
+    setText(
+      elements.testAlertStatus,
+      "Enable push notifications on this device before sending a test.",
+      true,
+    );
+    elements.testAlertButton.disabled = false;
+    elements.inboxTestAlertButton.disabled = false;
+    return;
+  }
+  setText(elements.testAlertStatus, "Linking this device for push delivery...");
+  try {
+    await syncOneSignalIdentity({ required: true });
+  } catch (error) {
+    setText(elements.testAlertStatus, error.message, true);
+    elements.testAlertButton.disabled = false;
+    elements.inboxTestAlertButton.disabled = false;
+    return;
+  }
   setText(elements.testAlertStatus, "Queueing a test alert...");
   const { error } = await client.rpc("request_test_notification");
   elements.testAlertButton.disabled = false;
@@ -1366,11 +1405,11 @@ async function requestTestAlert() {
   }
   setText(
     elements.testAlertStatus,
-    "Test alert queued. It will be delivered during the next scanner run.",
+    "Test alert queued. It should arrive within 15 minutes.",
   );
   setText(
     elements.inboxSummary,
-    "Test alert queued for the next scanner run.",
+    "Test alert queued for delivery within 15 minutes.",
   );
   await loadInbox();
 }
@@ -1857,7 +1896,12 @@ elements.refreshStatusButton.addEventListener("click", loadSystemHealth);
 elements.monitorForm.addEventListener("submit", addMonitor);
 elements.resumeFile.addEventListener("change", uploadResume);
 elements.removeResumeButton.addEventListener("click", removeResume);
-window.addEventListener("job-alerts-push-state-change", renderSetupHealth);
+window.addEventListener("job-alerts-push-state-change", () => {
+  renderSetupHealth();
+  if (isSignedIn() && window.JobAlertsUI?.isPushActive()) {
+    syncOneSignalIdentity();
+  }
+});
 for (const button of document.querySelectorAll("[data-close-dialog]")) {
   button.addEventListener("click", () => button.closest("dialog").close());
 }

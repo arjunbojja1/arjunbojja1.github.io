@@ -4,8 +4,10 @@ import assert from "node:assert/strict";
 import {
   effectivePostedDate,
   formatJobTiming,
+  personalizedJobScore,
   resumeMatchDetails,
   resumeMatchScore,
+  sortJobsRecommended,
   sortJobsNewestFirst,
 } from "../job-utils.js";
 
@@ -105,4 +107,55 @@ test("sorts newest-first with first-seen fallback", () => {
   );
 
   assert.deepEqual(jobs.map((job) => job.id), ["new", "fallback", "old"]);
+});
+
+test("ranks recommendations by location, preferences, resume, then recency", () => {
+  const preferences = {
+    locations: ["San Francisco", "New York"],
+    role_categories: ["software"],
+    include_keywords: ["backend"],
+    remote_only: false,
+  };
+  const preferred = {
+    id: "preferred",
+    title: "Backend Python Engineer",
+    company: "Example",
+    location: "San Francisco, CA",
+    description: "Build distributed systems in Python.",
+    recommendation_terms: ["backend", "python"],
+    role_category: "software",
+    posted_at: "2026-07-10",
+  };
+  const secondLocation = {
+    ...preferred,
+    id: "second-location",
+    location: "New York, NY",
+    posted_at: "2026-07-12",
+  };
+  const weakSpecialization = {
+    ...preferred,
+    id: "weak-specialization",
+    title: "Frontend Engineer",
+    description: "Build user interfaces.",
+    recommendation_terms: ["frontend"],
+    posted_at: "2026-07-12",
+  };
+
+  assert.ok(
+    personalizedJobScore(preferred, preferences, SOFTWARE_RESUME) >
+      personalizedJobScore(secondLocation, preferences, SOFTWARE_RESUME),
+  );
+  assert.ok(
+    personalizedJobScore(preferred, preferences, SOFTWARE_RESUME) >
+      personalizedJobScore(weakSpecialization, preferences, SOFTWARE_RESUME),
+  );
+  assert.deepEqual(
+    sortJobsRecommended(
+      [weakSpecialization, secondLocation, preferred],
+      preferences,
+      SOFTWARE_RESUME,
+      new Date("2026-07-13T12:00:00Z"),
+    ).map((job) => job.id),
+    ["preferred", "second-location", "weak-specialization"],
+  );
 });
